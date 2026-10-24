@@ -1,0 +1,1464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="OddsOracle">
+<meta name="theme-color" content="#b0b0c8">
+<title>OddsOracle TEST</title>
+<style>
+:root{
+  --bg:#e8eaed;--s1:#ffffff;--s2:#f2f4f7;--s3:#e4e6ea;
+  --bd:#d0d4db;--bd2:#b8bcc4;
+  --ink:#1a1d23;--muted:#6b7280;--dim:#9ca3af;
+  --silver:#374151;--silver2:#4b5563;--silver3:#6b7280;
+  --green:#16a34a;--red:#dc2626;--amber:#d97706;--blue:#2563eb;
+  --grad:linear-gradient(135deg,#6b7280,#374151);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overscroll-behavior:none;}
+body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:15px;min-height:100vh;padding-bottom:env(safe-area-inset-bottom);}
+input,textarea,button{font-family:inherit;}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--bd);background:var(--s1);position:sticky;top:0;z-index:100;}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo-icon{width:34px;height:34px;border-radius:8px;background:var(--grad);display:grid;place-items:center;font-size:18px;flex-shrink:0;}
+.logo-name{font-weight:800;font-size:1.15rem;letter-spacing:-0.02em;}
+.logo-name span{color:var(--silver);}
+.logo-sub{font-size:11px;color:var(--muted);margin-top:1px;}
+.hdr-right{display:flex;align-items:center;gap:8px;}
+.mode-badge{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:5px 10px;border-radius:999px;border:1px solid rgba(55,65,81,0.3);background:rgba(55,65,81,0.08);color:var(--silver);}
+.btn-sm{background:transparent;border:1px solid var(--bd2);color:var(--muted);padding:7px 12px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;}
+.tabs{display:flex;border-bottom:1px solid var(--bd);background:var(--s1);position:sticky;top:67px;z-index:99;}
+.tab{flex:1;padding:13px 10px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;text-align:center;transition:color .2s,border-color .2s;}
+.tab.active{color:var(--silver);border-bottom-color:var(--silver);}
+.zone{padding:18px;max-width:700px;margin:0 auto;}
+.box-label{font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:6px;font-weight:700;}
+.box-sub{font-size:12px;color:var(--dim);margin-bottom:8px;line-height:1.4;}
+.opt-tag{font-size:10px;background:rgba(156,163,175,0.2);color:var(--muted);padding:2px 7px;border-radius:999px;margin-left:5px;text-transform:uppercase;letter-spacing:0.05em;}
+textarea{width:100%;background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;color:var(--ink);font-family:"Courier New",monospace;font-size:12px;padding:13px;resize:vertical;min-height:170px;line-height:1.6;-webkit-appearance:none;}
+textarea::placeholder{color:var(--dim);font-family:inherit;font-size:12.5px;}
+textarea:focus{outline:none;border-color:var(--silver3);}
+.paste-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+@media(max-width:560px){.paste-grid{grid-template-columns:1fr;}}
+.paste-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;}
+.paste-grid-3 textarea{padding:8px;font-size:10.5px;}
+.paste-grid-3 .box-label{font-size:12px;}
+.paste-grid-3 .box-sub{font-size:10.5px;}
+.run-btn{width:100%;padding:16px;background:var(--grad);border:none;border-radius:12px;cursor:pointer;font-weight:800;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;color:#fff;display:flex;align-items:center;justify-content:center;gap:10px;-webkit-appearance:none;}
+.run-btn:active{filter:brightness(0.9);}
+.run-btn:disabled{opacity:0.4;cursor:not-allowed;}
+.thinking{display:flex;align-items:center;gap:10px;padding:16px 0;color:var(--silver3);font-size:14px;}
+.pulse{width:8px;height:8px;background:var(--silver3);border-radius:50%;animation:pulse 1.2s ease-in-out infinite;flex-shrink:0;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.3;transform:scale(0.8)}}
+.result-banner{background:linear-gradient(135deg,rgba(55,65,81,0.06),rgba(55,65,81,0.02));border:1px solid rgba(55,65,81,0.15);border-radius:14px;padding:16px 18px;margin-bottom:14px;position:relative;overflow:hidden;}
+.result-banner::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#374151,transparent);}
+.result-eye{font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--silver);margin-bottom:6px;font-weight:800;}
+.result-match{font-size:1.05rem;font-weight:700;}
+.result-mode{font-size:11px;color:var(--muted);margin-top:4px;}
+.no-pick{background:rgba(220,38,38,0.05);border:1px solid rgba(220,38,38,0.2);border-radius:14px;padding:28px;text-align:center;margin-bottom:14px;}
+.no-pick-icon{font-size:32px;margin-bottom:10px;}
+.no-pick-title{font-weight:800;color:var(--red);margin-bottom:8px;font-size:1.05rem;}
+.no-pick-reason{font-size:13.5px;color:var(--muted);line-height:1.5;}
+.pick-card{background:var(--s1);border:1px solid var(--bd2);border-radius:14px;margin-bottom:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);}
+.pick-inner{border-left:3px solid var(--silver3);}
+.pick-head{padding:14px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.pick-rank{font-size:10px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;margin-bottom:4px;}
+.pick-market{font-size:1.05rem;font-weight:800;color:var(--ink);margin-bottom:6px;}
+.pick-odds-display{font-family:"Courier New",monospace;font-weight:800;font-size:1.3rem;color:var(--silver);}
+.conf-badge{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;padding:3px 9px;border-radius:999px;margin-left:8px;}
+.conf-high{background:rgba(22,163,74,0.1);border:1px solid rgba(22,163,74,0.3);color:var(--green);}
+.conf-med{background:rgba(37,99,235,0.1);border:1px solid rgba(37,99,235,0.3);color:var(--blue);}
+.conf-low{background:rgba(217,119,6,0.1);border:1px solid rgba(217,119,6,0.3);color:var(--amber);}
+.score-ring-wrap{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px;}
+.score-ring-label{font-size:10px;color:var(--muted);}
+.pick-body{padding:0 16px 16px;border-top:1px solid var(--bd);}
+.pick-verdict{padding:10px 0 12px;font-size:13.5px;color:var(--silver2);line-height:1.5;}
+.prob-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.prob-label{font-size:12px;color:var(--muted);width:140px;flex-shrink:0;}
+.prob-track{flex:1;height:8px;background:rgba(0,0,0,0.08);border-radius:4px;overflow:hidden;}
+.prob-fill{height:100%;border-radius:4px;}
+.prob-val{font-family:"Courier New",monospace;font-size:13px;font-weight:700;width:44px;text-align:right;}
+.agree-box{display:flex;align-items:center;gap:12px;background:var(--s2);border:1px solid var(--bd);border-radius:10px;padding:11px 14px;margin:10px 0 8px;}
+.agree-num{font-family:"Courier New",monospace;font-weight:800;font-size:1.6rem;color:var(--blue);}
+.agree-label{font-size:12.5px;color:var(--muted);line-height:1.4;}
+.reducer-item{display:flex;align-items:flex-start;gap:7px;font-size:12px;color:var(--muted);padding:5px 0;border-top:1px solid var(--s3);}
+.chevron{font-size:14px;color:var(--muted);flex-shrink:0;transition:transform .2s;}
+.chevron.open{transform:rotate(180deg);}
+.data-found{background:var(--s2);border:1px solid var(--bd);border-radius:10px;padding:12px 14px;margin-top:10px;}
+.data-found-title{font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--dim);margin-bottom:8px;font-weight:700;}
+.data-tags{display:flex;flex-wrap:wrap;gap:6px;}
+.data-tag{font-size:11px;padding:3px 9px;border-radius:999px;font-weight:600;}
+.tag-ok{background:rgba(22,163,74,0.1);color:var(--green);border:1px solid rgba(22,163,74,0.2);}
+.tag-miss{background:rgba(0,0,0,0.05);color:var(--dim);border:1px solid var(--bd);}
+.footer-note{font-size:11.5px;color:var(--dim);line-height:1.6;border-top:1px solid var(--bd);padding-top:14px;margin-top:6px;}
+.log-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px;}
+.stat-box{background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:14px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+.stat-val{font-family:"Courier New",monospace;font-size:1.6rem;font-weight:800;}
+.stat-lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-top:4px;}
+.cal-section{background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:14px 16px;margin-bottom:16px;}
+.cal-title{font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:12px;font-weight:700;}
+.cal-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.cal-label{font-size:12px;color:var(--muted);width:90px;flex-shrink:0;}
+.cal-bar-wrap{flex:1;height:8px;background:rgba(0,0,0,0.06);border-radius:4px;overflow:hidden;}
+.cal-bar-fill{height:100%;border-radius:4px;}
+.cal-pct{font-family:"Courier New",monospace;font-size:12px;font-weight:700;width:40px;text-align:right;}
+.cal-n{font-size:11px;color:var(--dim);width:36px;text-align:right;}
+.log-entry{background:var(--s1);border:1px solid var(--bd);border-radius:12px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+.log-head{padding:10px 14px 8px;display:flex;justify-content:space-between;align-items:center;}
+.log-mode-tag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;text-transform:uppercase;background:rgba(107,114,128,0.1);color:var(--muted);border:1px solid var(--bd);}
+.log-picks{border-top:1px solid var(--bd);}
+.log-pick-row{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--s3);flex-wrap:wrap;}
+.log-pick-row:last-child{border-bottom:none;}
+.res-btns{display:flex;gap:5px;}
+.res-btn{background:transparent;border:1px solid var(--bd);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);}
+.res-btn.win{background:rgba(22,163,74,0.1);border-color:rgba(22,163,74,0.4);color:var(--green);}
+.res-btn.loss{background:rgba(220,38,38,0.1);border-color:rgba(220,38,38,0.4);color:var(--red);}
+.pending-tag{font-size:11px;color:var(--dim);display:flex;align-items:center;gap:3px;}
+.del-btn{background:transparent;border:none;cursor:pointer;color:var(--dim);padding:4px;font-size:16px;}
+.empty-log{text-align:center;padding:48px 20px;color:var(--muted);}
+.error-box{padding:13px 16px;background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.25);border-radius:10px;font-size:13.5px;color:var(--red);margin-bottom:14px;}
+.install-banner{display:none;}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div class="logo">
+    <div class="logo-icon">&#x26A1;</div>
+    <div>
+      <div class="logo-name">Odds<span>Oracle</span></div>
+      <div class="logo-sub" style="color:#e8a317">TEST COPY &middot; auto-fetch &middot; separate log</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <div class="mode-badge">&#x26A1; Engine</div>
+    <button class="btn-sm" id="installHdrBtn" onclick="triggerInstall()" style="background:var(--grad);color:#fff;border:none;">&#x1F4F2; Install</button>
+    <button class="btn-sm" id="resetBtn" style="display:none" onclick="resetApp()">&#x21BA; New</button>
+  </div>
+</div>
+<div class="tabs">
+  <div class="tab active" id="tabAnalyse" onclick="switchTab('analyse')">&#x26A1; Analyse</div>
+  <div class="tab" id="tabLog" onclick="switchTab('log')">&#x1F4CB; Log</div>
+</div>
+<div id="analyseTab" class="zone">
+  <div id="inputSection">
+    <div>
+      <div class="box-label">Odds Board <span class="opt-tag">up to 5 matches</span></div>
+      <div class="box-sub">Paste up to 5 full odds boards back-to-back, one after another — no separator needed, each match's team names + "Football//" marker is detected automatically.</div>
+      <textarea id="oddsInput" style="min-height:170px" placeholder="Paste match 1's full odds board, then straight after it paste match 2's, then match 3's... up to 5 matches in this one box."></textarea>
+    </div>
+    <div>
+      <div class="box-label">Last 5 + Last 15 Stats <span class="opt-tag">optional</span></div>
+      <div class="box-sub">mutating.com &mdash; paste Last 5 first, leave one blank line, then paste Last 15 straight after. Applies to Match 1 only.</div>
+      <button class="run-btn" id="fetchBtn" type="button" onclick="fetchMutating()" style="margin-bottom:8px;background:#2a2f3a">&#x1F4E1; Fetch stats from mutating (auto)</button>
+      <div id="fetchStatus" class="box-sub" style="margin-bottom:8px"></div>
+      <textarea id="formInput" style="min-height:170px" placeholder="Paste Last 5 stats here...&#10;&#10;(leave a blank line)&#10;&#10;...then paste Last 15 stats here."></textarea>
+    </div>
+    <div class="error-box" id="errorBox" style="display:none"></div>
+    <button class="run-btn" id="runBtn" onclick="runAnalysis()">&#x26A1; Find the picks</button>
+  </div>
+  <div class="thinking" id="thinkingBox" style="display:none">
+    <div class="pulse"></div>
+    <span id="thinkingText">Scanning markets...</span>
+  </div>
+  <div id="resultSection" style="display:none"></div>
+</div>
+<div id="logTab" class="zone" style="display:none">
+  <div style="background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;margin-bottom:14px;overflow:hidden">
+    <div onclick="toggleImportBox()" style="padding:11px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+      <div style="font-size:12.5px;font-weight:700;color:var(--muted)">&#x1F4E5; Import Results (Backtest)</div>
+      <div id="importChev" style="font-size:11px;color:var(--dim)">&#x25BE;</div>
+    </div>
+    <div id="importBody" style="display:none;padding:0 14px 14px">
+      <div style="font-size:11.5px;color:var(--dim);margin-bottom:10px;line-height:1.5">Paste past Oracle results to backtest the calibration. One line per pick:<br><span style="font-family:Courier New,monospace">Match: Team A vs Team B</span><br><span style="font-family:Courier New,monospace">Over 2.5 @ 1.57 | 10/10 | WIN</span></div>
+      <textarea id="importInput" style="min-height:110px" placeholder="Match: HPS Women vs Aaland United Women&#10;Over 2.5 @ 1.57 | 10/10 | WIN&#10;Home Team Over 1.5 (HPS Women) @ 1.92 | 8/10 | LOSS"></textarea>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn-sm" style="flex:1;background:var(--grad);color:#fff;border:none;padding:10px" onclick="importResults('replace')">&#x21BA; Start Over (Replace Log)</button>
+        <button class="btn-sm" style="flex:1;padding:10px" onclick="importResults('append')">&#x2795; Append</button>
+      </div>
+      <div id="importMsg" style="font-size:12px;margin-top:8px"></div>
+    </div>
+  </div>
+  <div id="logContent"></div>
+</div>
+<script>
+// ── INLINE PWA (manifest + service worker as blobs) ──
+(function(){
+  const manifest={name:"OddsOracle",short_name:"OddsOracle",description:"Football odds analysis",start_url:"/",display:"standalone",orientation:"portrait",background_color:"#e8eaed",theme_color:"#374151",icons:[{src:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%23374151'/><text x='96' y='130' text-anchor='middle' font-size='100'>⚡</text></svg>",sizes:"192x192",type:"image/svg+xml"}]};
+  const mblob=new Blob([JSON.stringify(manifest)],{type:"application/json"});
+  const link=document.createElement("link");link.rel="manifest";link.href=URL.createObjectURL(mblob);document.head.appendChild(link);
+  const swCode=`const CACHE="oo-v3";const SHELL=self.location.href;self.addEventListener("install",e=>{e.waitUntil(caches.open(CACHE).then(c=>c.add(SHELL)).then(()=>self.skipWaiting()));});self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});self.addEventListener("fetch",e=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).then(res=>{const clone=res.clone();caches.open(CACHE).then(c=>c.put(e.request,clone));return res;}).catch(()=>caches.match(SHELL))));});`;
+  if("serviceWorker"in navigator){const swblob=new Blob([swCode],{type:"application/javascript"});navigator.serviceWorker.register(URL.createObjectURL(swblob),{scope:"/"}).catch(()=>{});}
+})();
+
+// ── STORAGE ──
+const loadLog=()=>{try{return JSON.parse(localStorage.getItem("oo_log")||"[]");}catch{return[];}};
+const saveLog=log=>{try{localStorage.setItem("oo_log",JSON.stringify(log.slice(0,5000)));}catch{}};
+
+// ── HELPERS ──
+const imp=o=>(!o||o<=1)?0:+((1/o)*100).toFixed(1);
+const avg2=(a,b)=>a==null&&b==null?null:a==null?b:b==null?a:(a+b)/2;
+const pct=s=>{if(s==null)return null;const n=parseFloat(String(s).replace("%",""));return isNaN(n)?null:n;};
+
+// ── SCORELINE PARSER ──
+function parseScorelines(raw){
+  if(!raw||!raw.trim())return{avgGoals:null,streakOver15:0,streakLoss:0,bttsStreak:0,over15Pct:null,over25Pct:null,bttsPct:null};
+  const lines=raw.split("\n").map(l=>l.trim()).filter(l=>l);
+
+  // Primary: mutating.com "Last Matches" format — each side's goals appear as
+  // teamName, teamName (repeated), bareDigitScore (three separate lines).
+  // Pairing consecutive goal-entries gives real match scorelines without picking up
+  // standings-table numbers or kickoff times (e.g. "19:15") like a loose digit scan would.
+  const goalEntries=[];
+  for(let i=0;i+2<lines.length;i++){
+    if(lines[i]===lines[i+1]&&/^\d+$/.test(lines[i+2])){
+      const g=parseInt(lines[i+2],10);
+      if(g<=20){goalEntries.push(g);i+=2;}
+    }
+  }
+  let results=[];
+  for(let i=0;i+1<goalEntries.length;i+=2){
+    const h=goalEntries[i],a=goalEntries[i+1];
+    results.push({h,a,total:h+a,btts:h>0&&a>0,over15:h+a>1,over25:h+a>2});
+  }
+
+  // Fallback: manual paste like "2-1" per line, or two bare score lines in a row,
+  // for input that isn't a mutating.com dump (no team-name-duplicate pattern found).
+  if(results.length===0){
+    for(let i=0;i<lines.length;i++){
+      if(/^\d+$/.test(lines[i])&&i+1<lines.length&&/^\d+$/.test(lines[i+1])){
+        const h=parseInt(lines[i]),a=parseInt(lines[i+1]);
+        if(h<=20&&a<=20){results.push({h,a,total:h+a,btts:h>0&&a>0,over15:h+a>1,over25:h+a>2});i++;continue;}
+      }
+      const m=lines[i].match(/^(\d+)\s*-\s*(\d+)$/);
+      if(m){const h=parseInt(m[1]),a=parseInt(m[2]);if(h<=20&&a<=20)results.push({h,a,total:h+a,btts:h>0&&a>0,over15:h+a>1,over25:h+a>2});}
+    }
+  }
+
+  if(results.length===0)return{avgGoals:null,streakOver15:0,bttsStreak:0,over15Pct:null,over25Pct:null,bttsPct:null};
+  const avgGoals=+(results.reduce((s,r)=>s+r.total,0)/results.length).toFixed(2);
+  const over15Pct=+(results.filter(r=>r.over15).length/results.length*100).toFixed(0);
+  const over25Pct=+(results.filter(r=>r.over25).length/results.length*100).toFixed(0);
+  const bttsPct=+(results.filter(r=>r.btts).length/results.length*100).toFixed(0);
+  let streakOver15=0,bttsStreak=0;
+  for(const r of results){if(r.over15)streakOver15++;else break;}
+  for(const r of results){if(r.btts)bttsStreak++;else break;}
+  return{avgGoals,over15Pct,over25Pct,bttsPct,streakOver15,bttsStreak,count:results.length};
+}
+
+// ── STANDINGS PARSER ──
+function parseStandings(raw){
+  if(!raw||!raw.trim())return{homePos:null,awayPos:null,gap:null,homePts:null,awayPts:null,homeStronger:null,ptsDiff:null};
+  const lines=raw.split("\n").map(l=>l.trim()).filter(l=>l);
+  const entries=[];
+  for(let i=0;i<lines.length;i++){
+    if(/^\d{1,2}$/.test(lines[i])){
+      const pos=parseInt(lines[i]);
+      if(pos>=1&&pos<=30){
+        let pts=null,gd=null;
+        for(let j=i+1;j<Math.min(i+12,lines.length);j++){
+          if(/^\d{1,3}$/.test(lines[j])&&pts===null&&parseInt(lines[j])<=150)pts=parseInt(lines[j]);
+          if(/^\d+:\d+$/.test(lines[j])){const[g,gc]=lines[j].split(":").map(Number);gd=g-gc;}
+        }
+        entries.push({pos,pts,gd});
+      }
+    }
+  }
+  const home=entries[0]||{pos:null,pts:null,gd:null};
+  const away=entries[1]||{pos:null,pts:null,gd:null};
+  const gap=home.pos&&away.pos?Math.abs(home.pos-away.pos):null;
+  return{homePos:home.pos,awayPos:away.pos,gap,homePts:home.pts,awayPts:away.pts,homeGD:home.gd,awayGD:away.gd,homeStronger:home.pos&&away.pos&&home.pos<away.pos,ptsDiff:home.pts&&away.pts?Math.abs(home.pts-away.pts):null};
+}
+
+// ── FORM DATA PARSER ──
+function parseFormData(raw){
+  if(!raw||!raw.trim())return null;
+  const lines=raw.split("\n").map(l=>l.trim()).filter(l=>l);
+  const r={home_btts:null,away_btts:null,home_over25:null,away_over25:null,home_over15:null,away_over15:null,home_under25:null,away_under25:null,home_win:null,away_win:null,home_draw:null,away_draw:null,home_goals_scored:null,away_goals_scored:null,home_goals_conceded:null,away_goals_conceded:null,home_clean_sheet:null,away_clean_sheet:null,trends:[]};
+  for(const line of lines){
+    if(line.includes("\t")){
+      const p=line.split("\t").map(x=>x.trim());
+      if(p.length>=3){
+        const L=pct(p[0]),label=p[1].toLowerCase(),Rv=pct(p[2]);
+        if(label.includes("both teams to score")&&!label.includes("first")&&!label.includes("second")&&!label.includes("bbts")){r.home_btts=L;r.away_btts=Rv;}
+        if(label==="over 2.5 goals"){r.home_over25=L;r.away_over25=Rv;}
+        if(label==="over 1.5 goals"){r.home_over15=L;r.away_over15=Rv;}
+        if(label==="under 2.5 goals"){r.home_under25=L;r.away_under25=Rv;}
+        if(label==="win"){r.home_win=L;r.away_win=Rv;}
+        if(label==="draw"){r.home_draw=L;r.away_draw=Rv;}
+        if(label==="goals scored per game"){r.home_goals_scored=L;r.away_goals_scored=Rv;}
+        if(label==="goals conceded per game"){r.home_goals_conceded=L;r.away_goals_conceded=Rv;}
+        if(label==="clean sheets"){r.home_clean_sheet=L;r.away_clean_sheet=Rv;}
+      }
+    }
+    const lc=line.toLowerCase();
+    if(lc.includes("games have over")||lc.includes("undefeated")||lc.includes("haven't lost")||lc.includes("have scored")||lc.includes("have over")||lc.includes("games have under"))r.trends.push(line);
+  }
+  return r;
+}
+
+// ── MERGE FORM WINDOWS (L5=40%, L15=60%) ──
+function mergeFormWindows(f5,f15){
+  if(!f5&&!f15)return null;
+  if(!f5)return f15;
+  if(!f15)return f5;
+  const w5=0.4,w15=0.6;
+  const fields=["home_btts","away_btts","home_over25","away_over25","home_over15","away_over15","home_under25","away_under25","home_win","away_win","home_draw","away_draw","home_goals_scored","away_goals_scored","home_goals_conceded","away_goals_conceded","home_clean_sheet","away_clean_sheet"];
+  const merged={...f5,trends:[...(f5.trends||[]),...(f15.trends||[])],divergences:[]};
+  for(const field of fields){
+    const v5=f5[field],v15=f15[field];
+    if(v5!=null&&v15!=null){
+      merged[field]=+(v5*w5+v15*w15).toFixed(1);
+      if(Math.abs(v5-v15)>=20)merged.divergences.push(field+" diverges: L5="+v5+"% vs L15="+v15+"%");
+    }else if(v15!=null){merged[field]=v15;}else if(v5!=null){merged[field]=v5;}
+  }
+  return merged;
+}
+
+// ── ODDS BOARD PARSER ──
+function parseOddsBoard(raw){
+  const lines=raw.split("\n").map(l=>l.trim()).filter(l=>l.length>0);
+  const r={match:null,home_win:null,draw:null,away_win:null,btts_yes:null,btts_no:null,over_15:null,under_15:null,over_25:null,under_25:null,over_35:null,under_35:null,over_45:null,under_45:null,dnb_home:null,dnb_away:null,dc_1x:null,dc_x2:null,dc_12:null,bpw_home_pct:null,bpw_draw_pct:null,bpw_away_pct:null,bpw_btts:null,bpw_over15:null,bpw_over25:null,bpw_goals_avg:null,home_team_goals:{},away_team_goals:{},all_markets:[]};
+  for(let i=2;i<lines.length;i++){if(lines[i]==="Football//"){r.homeTeam=lines[i-2];r.awayTeam=lines[i-1];r.match=r.homeTeam+" vs "+r.awayTeam;break;}}
+  for(let i=0;i<lines.length;i++){
+    if(lines[i]==="WIN PROBABILITY"&&/^\d+$/.test(lines[i+1]))r.bpw_home_pct=parseInt(lines[i+1]);
+    if(lines[i]==="DRAW"&&/^\d+$/.test(lines[i+1]))r.bpw_draw_pct=parseInt(lines[i+1]);
+    if(lines[i]==="BTTS"&&/^\d+$/.test(lines[i+1]))r.bpw_btts=parseInt(lines[i+1]);
+    if(lines[i]==="OVER 1.5"&&/^\d+$/.test(lines[i+1]))r.bpw_over15=parseInt(lines[i+1]);
+    if(lines[i]==="OVER 2.5"&&/^\d+$/.test(lines[i+1]))r.bpw_over25=parseInt(lines[i+1]);
+    if(lines[i]==="GOALS SCORED"&&/^\d+\.\d+$/.test(lines[i+1]))r.bpw_goals_avg=parseFloat(lines[i+1]);
+  }
+  if(r.bpw_home_pct&&r.bpw_draw_pct)r.bpw_away_pct=100-r.bpw_home_pct-r.bpw_draw_pct;
+  let section="";
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i],next=lines[i+1]||"";
+    if(line.includes("|")){section=line.toLowerCase();continue;}
+    if(!/^\d+\.\d+$/.test(next))continue;
+    const odds=parseFloat(next);
+    if(odds<1.10||odds>100)continue;
+    if(line.length>60||/^(statistics|discover|sport|uganda|help|stay|your|licen|you have|betting|app version|back to top|menu|betslip|account)/i.test(line))continue;
+    r.all_markets.push({label:line,section,odds,implied:imp(odds)});
+    if(section==="1x2 | full time"){if(line==="1"&&!r.home_win)r.home_win=odds;else if(line==="X"&&!r.draw)r.draw=odds;else if(line==="2"&&!r.away_win)r.away_win=odds;}
+    else if(section==="both teams to score | full time"){if(line==="Yes"&&!r.btts_yes)r.btts_yes=odds;else if(line==="No"&&!r.btts_no)r.btts_no=odds;}
+    else if(section==="over/under | full time"){if(line==="Over 1.5"&&!r.over_15)r.over_15=odds;else if(line==="Under 1.5"&&!r.under_15)r.under_15=odds;else if(line==="Over 2.5"&&!r.over_25)r.over_25=odds;else if(line==="Under 2.5"&&!r.under_25)r.under_25=odds;else if(line==="Over 3.5"&&!r.over_35)r.over_35=odds;else if(line==="Under 3.5"&&!r.under_35)r.under_35=odds;else if(line==="Over 4.5"&&!r.over_45)r.over_45=odds;else if(line==="Under 4.5"&&!r.under_45)r.under_45=odds;}
+    else if(section==="draw no bet | full time"){if(line==="1"&&!r.dnb_home)r.dnb_home=odds;else if(line==="2"&&!r.dnb_away)r.dnb_away=odds;}
+    else if(section==="double chance | full time"){if(line==="1X"&&!r.dc_1x)r.dc_1x=odds;else if(line==="X2"&&!r.dc_x2)r.dc_x2=odds;else if(line==="12"&&!r.dc_12)r.dc_12=odds;}
+    else if(/^over\/under \| .+ \| full time$/.test(section)){
+      // A team-qualified Over/Under section — capture it as that TEAM's own goals market,
+      // separate from the whole-match total above.
+      const teamPart=section.replace(/^over\/under \|\s*/,"").replace(/\s*\|\s*full time$/,"").trim();
+      const hn=(r.homeTeam||"").toLowerCase().trim(),an=(r.awayTeam||"").toLowerCase().trim();
+      const side=teamPart===hn?"home":teamPart===an?"away":(hn&&teamPart.includes(hn))?"home":(an&&teamPart.includes(an))?"away":null;
+      const m2=line.match(/^(Over|Under)\s+([0-9.]+)$/i);
+      if(side&&m2){
+        const dirKey=(m2[1].toLowerCase()==="over"?"over_":"under_")+m2[2].replace(".","");
+        const tgt=side==="home"?r.home_team_goals:r.away_team_goals;
+        if(tgt[dirKey]==null)tgt[dirKey]=odds;
+      }
+    }
+    i++;
+  }
+  return r;
+}
+
+// ── MARKET CLASSIFIER ──
+function classifyMarket(label,section,implied){
+  const l=label.toLowerCase(),s=section.toLowerCase();
+  const votes=[];
+  // A section like "over/under | full time" (1 pipe) is the whole-match total.
+  // "over/under | hps women | full time" (2 pipes) is a single TEAM's goals market —
+  // never let it feed the match-total outcomes below, or it inflates the vote
+  // count and can get confused with the real full-match Over/Under line.
+  const teamQualified=s.split("|").length>2;
+
+  // ── OVER/UNDER (all thresholds) ──
+  const overM=l.match(/^over ([0-9.]+)$/);
+  if(overM&&!teamQualified&&!s.includes("corner")&&!s.includes("booking")&&!s.includes("card")){
+    const n=parseFloat(overM[1]);
+    if(implied>50){
+      if(n<=1.5)votes.push({outcome:"over_15",w:1},{outcome:"goals",w:0.9});
+      if(n<=2.5&&n>1.5)votes.push({outcome:"over_25",w:1},{outcome:"goals",w:0.9});
+      if(n<=3.5&&n>2.5)votes.push({outcome:"over_35",w:0.9},{outcome:"over_25",w:0.7},{outcome:"goals",w:0.8});
+      if(n<=4.5&&n>3.5)votes.push({outcome:"over_45",w:0.8},{outcome:"over_25",w:0.6},{outcome:"goals",w:0.7});
+      if(n>4.5)votes.push({outcome:"goals",w:0.6},{outcome:"over_25",w:0.5});
+    }
+  }
+  const underM=l.match(/^under ([0-9.]+)$/);
+  if(underM&&!teamQualified&&!s.includes("corner")&&!s.includes("booking")&&!s.includes("card")){
+    const n=parseFloat(underM[1]);
+    if(implied>50){
+      if(n>=2.5)votes.push({outcome:"under_25",w:1},{outcome:"no_goals",w:0.8});
+      if(n>=3.5)votes.push({outcome:"under_35",w:0.9});
+      // Under 3.5 with high implied means at least some goals likely
+      if(n>=3.5&&implied>70)votes.push({outcome:"over_15",w:0.4});
+    }
+  }
+
+  // ── BTTS ──
+  if((l==="yes"||l.includes("btts"))&&s.includes("both teams")&&!s.includes("first half")&&!s.includes("second half")&&implied>50)
+    votes.push({outcome:"btts_yes",w:1},{outcome:"goals",w:0.9},{outcome:"over_15",w:0.8},{outcome:"over_25",w:0.5});
+  if(l==="no"&&s.includes("both teams")&&!s.includes("first half")&&!s.includes("second half")&&implied>45)
+    votes.push({outcome:"btts_no",w:1},{outcome:"no_goals",w:0.8});
+
+  // ── BTTS FIRST HALF ──
+  if(l==="yes"&&s.includes("both teams")&&s.includes("first half")&&implied>45)
+    votes.push({outcome:"goals",w:0.7},{outcome:"over_25",w:0.5});
+
+  // ── SCORE IN BOTH HALVES ──
+  if(l.includes("score in both")||l.includes("goal in both"))
+    votes.push({outcome:"goals",w:0.8},{outcome:"over_25",w:0.6},{outcome:"btts_yes",w:0.5});
+
+  // ── HT OVER/UNDER ──
+  if(s.includes("first half")&&!teamQualified){
+    const htOver=l.match(/^over ([0-9.]+)$/);
+    if(htOver&&!s.includes("corner")){
+      const n=parseFloat(htOver[1]);
+      if(n<=0.5&&implied>60)votes.push({outcome:"goals",w:0.7},{outcome:"over_15",w:0.6});
+      if(n<=1.5&&n>0.5&&implied>50)votes.push({outcome:"goals",w:0.8},{outcome:"over_25",w:0.6});
+      if(n<=2.5&&n>1.5&&implied>40)votes.push({outcome:"over_25",w:0.7},{outcome:"goals",w:0.7});
+    }
+  }
+
+  // ── SECOND HALF OVER ──
+  if(s.includes("second half")&&!teamQualified){
+    const shOver=l.match(/^over ([0-9.]+)$/);
+    if(shOver&&!s.includes("corner")){
+      const n=parseFloat(shOver[1]);
+      if(n<=0.5&&implied>65)votes.push({outcome:"goals",w:0.6},{outcome:"over_15",w:0.5});
+      if(n<=1.5&&n>0.5&&implied>50)votes.push({outcome:"goals",w:0.7},{outcome:"over_25",w:0.5});
+    }
+  }
+
+  // ── CORRECT SCORE (powerful goals signal) ──
+  if(s.includes("correct score")||s.includes("exact score")){
+    // Extract score from label e.g. "2-1", "3-0", "2-2"
+    const scoreM=l.match(/(\d+)\s*[-:]\s*(\d+)/);
+    if(scoreM){
+      const h=parseInt(scoreM[1]),a=parseInt(scoreM[2]),total=h+a;
+      if(implied>5){ // only meaningful correct score prices
+        if(total>2)votes.push({outcome:"over_25",w:implied/20},{outcome:"goals",w:implied/15});
+        if(total>1)votes.push({outcome:"over_15",w:implied/15});
+        if(h>0&&a>0)votes.push({outcome:"btts_yes",w:implied/20});
+        if(total<=2)votes.push({outcome:"under_25",w:implied/20});
+      }
+    }
+  }
+
+  // ── MULTIGOALS ──
+  if(s.includes("multigoal")||s.includes("multi goal")){
+    if((l.includes("2-3")||l.includes("3-4")||l.includes("3-5")||l.includes("2-4")||l.includes("3+"))&&implied>35)
+      votes.push({outcome:"over_25",w:0.8},{outcome:"goals",w:0.7});
+    if((l.includes("4+")||l.includes("4-5")||l.includes("4-6")||l.includes("5+"))&&implied>25)
+      votes.push({outcome:"over_35",w:0.8},{outcome:"over_25",w:0.6});
+    if((l.includes("1-2")||l.includes("0-1"))&&implied>40)
+      votes.push({outcome:"under_25",w:0.7},{outcome:"no_goals",w:0.6});
+  }
+
+  // ── HANDICAP (strong goals signal) ──
+  if(s.includes("handicap")||s.includes("asian")){
+    const hdpM=l.match(/([+-]?\d+\.?\d*)/);
+    if(hdpM){
+      const hdp=parseFloat(hdpM[1]);
+      // Home team giving goals = strong home expected to win big = high scoring likely
+      if(l.includes("home")&&hdp<=-1&&implied>50)votes.push({outcome:"over_25",w:0.7},{outcome:"goals",w:0.6});
+      if(l.includes("away")&&hdp<=-1&&implied>45)votes.push({outcome:"over_25",w:0.6},{outcome:"goals",w:0.5});
+      // Handicap lines close to 0 = competitive = less clear on goals
+    }
+    // Generic handicap home -1 or more
+    if((l.includes("home -1")||l.includes("-1.5")||l.includes("-2"))&&implied>45)
+      votes.push({outcome:"over_25",w:0.7},{outcome:"goals",w:0.6});
+  }
+
+  // ── WINNING MARGIN ──
+  if(s.includes("winning margin")){
+    if((l.includes("home by 2")||l.includes("home by 3")||l.includes("away by 2")||l.includes("away by 3"))&&implied>20)
+      votes.push({outcome:"over_25",w:0.6},{outcome:"goals",w:0.5});
+    if(l.includes("home by 1")||l.includes("away by 1"))
+      votes.push({outcome:"goals",w:0.4});
+    if(l.includes("draw")&&implied>20)votes.push({outcome:"under_25",w:0.3});
+  }
+
+  // ── RESULT MARKETS ──
+  if(l==="1"&&(s.includes("1x2")||s.includes("draw no bet"))&&!s.includes("first half")&&implied>42)
+    votes.push({outcome:"home_win",w:1});
+  if(l==="1x"&&s.includes("double chance")&&!s.includes("first half")&&implied>65)
+    votes.push({outcome:"home_no_lose",w:1},{outcome:"home_win",w:0.6});
+  if(l==="yes"&&s.includes("win to nil")&&s.includes("home")&&implied>40)
+    votes.push({outcome:"home_win",w:0.8},{outcome:"no_goals",w:0.4});
+  if(l==="yes"&&s.includes("win both halves")&&s.includes("home")&&implied>35)
+    votes.push({outcome:"home_win",w:0.7},{outcome:"goals",w:0.5});
+  if(l==="yes"&&s.includes("win either half")&&implied>50)
+    votes.push({outcome:"goals",w:0.5});
+  if(l==="2"&&(s.includes("1x2")||s.includes("draw no bet"))&&!s.includes("first half")&&implied>38)
+    votes.push({outcome:"away_win",w:1});
+  if(l==="x2"&&s.includes("double chance")&&!s.includes("first half")&&implied>55)
+    votes.push({outcome:"away_no_lose",w:1},{outcome:"away_win",w:0.6});
+  if(l==="yes"&&s.includes("win to nil")&&s.includes("away")&&implied>35)
+    votes.push({outcome:"away_win",w:0.8});
+  if(l==="x"&&s.includes("1x2")&&!s.includes("first half"))
+    votes.push({outcome:"draw",w:1});
+  if(l==="yes"&&s.includes("clean sheet")&&s.includes("home")&&!s.includes("first half")&&implied>40)
+    votes.push({outcome:"home_win",w:0.7},{outcome:"no_goals",w:0.6});
+  if(l==="yes"&&s.includes("clean sheet")&&s.includes("away")&&!s.includes("first half")&&implied>35)
+    votes.push({outcome:"away_win",w:0.7});
+
+  // ── HT/FT COMBO (goals signals) ──
+  if(s.includes("half time")&&s.includes("full time")){
+    if((l.includes("1/1")||l.includes("2/2")||l.includes("1/2")||l.includes("2/1"))&&implied>15)
+      votes.push({outcome:"goals",w:0.5});
+  }
+
+  // ── ODD/EVEN GOALS ──
+  if(l==="odd"&&!s.includes("corner")&&implied>52)votes.push({outcome:"goals",w:0.4});
+  if(l==="even"&&!s.includes("corner")&&implied>52)votes.push({outcome:"goals",w:0.3});
+
+  // ── TEAM GOALS (Home/Away individual) ──
+  if((s.includes("home team")&&s.includes("over"))||l.includes("home over")){
+    const tgM=l.match(/over ([0-9.]+)/);
+    if(tgM&&implied>50){
+      const n=parseFloat(tgM[1]);
+      if(n<=0.5)votes.push({outcome:"goals",w:0.6},{outcome:"home_win",w:0.4});
+      if(n<=1.5)votes.push({outcome:"over_25",w:0.5},{outcome:"goals",w:0.6});
+    }
+  }
+  if((s.includes("away team")&&s.includes("over"))||l.includes("away over")){
+    const tgM=l.match(/over ([0-9.]+)/);
+    if(tgM&&implied>50){
+      const n=parseFloat(tgM[1]);
+      if(n<=0.5)votes.push({outcome:"goals",w:0.6},{outcome:"away_win",w:0.4});
+      if(n<=1.5)votes.push({outcome:"over_25",w:0.5},{outcome:"goals",w:0.6});
+    }
+  }
+
+  // ── COMBO MARKETS (1X2 + Goals) ──
+  if(s.includes("and over")||l.includes("and over")||s.includes("1x2 and")){
+    if(l.includes("over 2.5")||l.includes("2.5"))votes.push({outcome:"over_25",w:0.6},{outcome:"goals",w:0.5});
+    if(l.includes("over 1.5")||l.includes("1.5"))votes.push({outcome:"over_15",w:0.6},{outcome:"goals",w:0.5});
+    if(l.includes("btts")||l.includes("both"))votes.push({outcome:"btts_yes",w:0.6});
+  }
+
+  return votes;
+
+}
+
+function countVotes(markets){
+  const counts={},supporting={};
+  for(const m of markets){
+    const votes=classifyMarket(m.label,m.section,m.implied);
+    for(const v of votes){
+      counts[v.outcome]=(counts[v.outcome]||0)+v.w;
+      if(!supporting[v.outcome])supporting[v.outcome]=[];
+      supporting[v.outcome].push(m);
+    }
+  }
+  return{counts,supporting};
+}
+
+// ── BOOKMAKER BRAIN ENGINE ──
+function runRulesEngine(odds,form,formText,form15Text,marketHitRates){
+  marketHitRates=marketHitRates||{};
+  const candidates=[];
+  const sl5=parseScorelines(formText);
+  const sl15=parseScorelines(form15Text||"");
+  const std=parseStandings(formText||form15Text||"");
+  const posGap=std.gap||0;
+  const homeStronger=std.homeStronger;
+  const ptsDiff=std.ptsDiff||0;
+  const div=form&&form.divergences?form.divergences:[];
+
+  function truePct(l15val,l5val,bpwVal){
+    const sources=[];
+    if(l15val!=null)sources.push({v:l15val,w:0.45});
+    if(l5val!=null)sources.push({v:l5val,w:0.45});
+    if(bpwVal!=null)sources.push({v:bpwVal,w:0.10});
+    if(sources.length===0)return null;
+    const totalW=sources.reduce((s,x)=>s+x.w,0);
+    return+sources.reduce((s,x)=>s+x.v*(x.w/totalW),0).toFixed(1);
+  }
+
+  const TP={};
+  const l15combined_btts=form&&form.home_btts!=null&&form.away_btts!=null?(form.home_btts+form.away_btts)/2:null;
+  const l5combined_btts=sl5.bttsPct;
+  TP.btts_yes=truePct(l15combined_btts,l5combined_btts,odds.bpw_btts);
+  TP.btts_no=TP.btts_yes!=null?100-TP.btts_yes:null;
+
+  const l15_o15=form&&form.home_over15!=null&&form.away_over15!=null?(form.home_over15+form.away_over15)/2:null;
+  TP.over_15=truePct(l15_o15,sl5.over15Pct,odds.bpw_over15);
+
+  const l15_o25=form&&form.home_over25!=null&&form.away_over25!=null?(form.home_over25+form.away_over25)/2:null;
+  TP.over_25=truePct(l15_o25,sl5.over25Pct,odds.bpw_over25);
+
+  const hU25=form&&form.home_under25!=null?form.home_under25:(form&&form.home_over25!=null?100-form.home_over25:null);
+  const aU25=form&&form.away_under25!=null?form.away_under25:(form&&form.away_over25!=null?100-form.away_over25:null);
+  const slU25=sl5.over25Pct!=null?100-sl5.over25Pct:null;
+  TP.under_25=truePct(hU25!=null&&aU25!=null?(hU25+aU25)/2:null,slU25,odds.bpw_over25!=null?100-odds.bpw_over25:null);
+
+  const hU15=form&&form.home_over15!=null?100-form.home_over15:null;
+  const aU15=form&&form.away_over15!=null?100-form.away_over15:null;
+  const slU15=sl5.over15Pct!=null?100-sl5.over15Pct:null;
+  TP.under_15=truePct(hU15!=null&&aU15!=null?(hU15+aU15)/2:null,slU15,null);
+
+  TP.over_35=truePct(l15_o25!=null?l15_o25*0.65:null,sl5.over25Pct!=null?sl5.over25Pct*0.65:null,null);
+  TP.home_win=truePct(form&&form.home_win!=null?form.home_win:null,null,odds.bpw_home_pct);
+  TP.away_win=truePct(form&&form.away_win!=null?form.away_win:null,null,odds.bpw_away_pct);
+  TP.home_no_lose=TP.home_win!=null?Math.min(TP.home_win+(form&&form.home_draw||0),96):null;
+  TP.away_no_lose=TP.away_win!=null?Math.min(TP.away_win+(form&&form.away_draw||0),96):null;
+  TP.goals=TP.over_15;
+  TP.no_goals=TP.under_25;
+  TP.draw=form&&form.home_draw!=null?truePct(form.home_draw,null,odds.bpw_draw_pct):null;
+
+  const{counts}=countVotes(odds.all_markets);
+  const streakOver15=Math.max(sl5.streakOver15||0,sl15.streakOver15||0);
+  const bttsStreak=Math.max(sl5.bttsStreak||0,sl15.bttsStreak||0);
+  const xg=sl15.avgGoals||sl5.avgGoals;
+
+  function bookmakerScore(tp,marketOdds,outcome){
+    if(tp==null||!marketOdds)return 0;
+    const implied=imp(marketOdds);
+    const edge=tp-implied;
+    let agree=Math.round(counts[outcome]||0);
+    if(["draw no bet","handicap"].some(k=>marketOdds&&outcome)){}
+    // Streak boosts — Over 2.5 specific
+    if(streakOver15>=4&&outcome==="over_25")agree=Math.min(agree+2,10);
+    else if(streakOver15>=3&&outcome==="over_25")agree=Math.min(agree+1,10);
+    // xG boost
+    if(xg&&xg>3.0&&(outcome==="over_25"||outcome==="btts_yes"))agree=Math.min(agree+1,10);
+    if(xg&&xg<1.5&&(outcome==="under_25"||outcome==="no_goals"))agree=Math.min(agree+1,10);
+    // Position boosts
+    if(homeStronger&&posGap>=5&&outcome==="home_win")agree=Math.min(agree+1,10);
+    if(!homeStronger&&posGap>=5&&outcome==="away_win")agree=Math.min(agree+1,10);
+    let base=0;
+    // Over 2.5 strict thresholds — calibrated from real results
+    if(tp>=80)base=10;
+    else if(tp>=75)base=9;
+    else if(tp>=70)base=8.5;
+    else if(tp>=65)base=8;
+    else if(tp>=60)base=7;
+    else return 0; // Below 60% true prob = no pick on Over 2.5
+    // HARD PENALTY: expected goals too low for an Over 2.5 pick — reduce heavily
+    if(xg&&xg<2.0&&outcome==="over_25")base=Math.max(base-3,0);
+    if(xg&&xg<2.5&&outcome==="over_25")base=Math.max(base-1,0);
+    if(edge>10)base=Math.min(base+1,10);else if(edge>5)base=Math.min(base+0.5,10);else if(edge<-10)base=Math.max(base-2,0);else if(edge<-5)base=Math.max(base-1,0);
+    if(agree>=6)base=Math.min(base+1,10);else if(agree>=4)base=Math.min(base+0.5,10);else if(agree<2)base=Math.max(base-1,0);
+    if(div.some(d=>d.toLowerCase().includes(outcome.replace("_",""))))base=Math.max(base-2,0);
+    if(homeStronger&&posGap>=5&&outcome==="away_win")base=Math.max(base-1.5,0);
+    if(!homeStronger&&posGap>=5&&outcome==="home_win")base=Math.max(base-1,0);
+    if(std.awayPos>=14&&outcome==="away_win")base=Math.max(base-1,0);
+    if(xg&&xg>=2.5&&xg<=3.5&&outcome==="over_25")base=Math.max(base-0.5,0);
+    return+base.toFixed(1);
+  }
+
+  const outcomeMap={btts_yes:"btts_yes",btts_no:"btts_no",over_15:"over_15",under_15:"under_15",over_25:"over_25",under_25:"under_25",over_35:"over_35",goals:"goals",no_goals:"no_goals",home_win:"home_win",away_win:"away_win",home_no_lose:"home_no_lose",away_no_lose:"away_no_lose",draw:"draw"};
+
+  for(const m of odds.all_markets){
+    if(!m.odds||m.odds<1.10)continue;
+    const mvotes=classifyMarket(m.label,m.section,m.implied);
+    if(mvotes.length===0)continue;
+    mvotes.sort((a,b)=>b.w-a.w);
+    // "goals" and "no_goals" are internal cross-market signals only (used for the
+    // agreement count below) — never real, sellable markets. Picking one as the
+    // primary outcome here caused an unrelated market's odds (e.g. a Half-Time
+    // Over 0.5 line) to get displayed as if it were the real "Over 1.5"/"Over 2.5".
+    const sellable=mvotes.filter(v=>v.outcome!=="goals"&&v.outcome!=="no_goals");
+    if(sellable.length===0)continue;
+    const primaryOutcome=sellable[0].outcome;
+    // This is an Over-only engine — never surface an Under X.5 goals pick.
+    if(primaryOutcome.startsWith("under_"))continue;
+    const tpKey=outcomeMap[primaryOutcome];
+    const tp=tpKey?TP[tpKey]:null;
+    if(tp==null)continue;
+    let score=bookmakerScore(tp,m.odds,primaryOutcome);
+    // BTTS has repeatedly underperformed in logged results (53% over 34 picks —
+    // the weakest major market) even at scores that other markets convert fine at.
+    // Hold it to a stricter floor than everything else rather than treat it as
+    // equally trustworthy at 8/10.
+    const isBTTS=primaryOutcome==="btts_yes"||primaryOutcome==="btts_no";
+    const scoreFloor=isBTTS?9:8;
+    if(score<scoreFloor)continue;
+    // Learn from your own logged results: if this market type has a real track
+    // record, let it nudge the score — a small boost for a pattern that keeps
+    // hitting, a penalty for one that keeps missing. BTTS gets a shorter lookback
+    // (5 picks vs 8 for everything else) since it's already shown a weak pattern
+    // and shouldn't need as long a track record before the penalty kicks in.
+    const OUTCOME_MKT_TYPE={over_15:"Over 1.5",over_25:"Over 2.5",over_35:"Over 3.5",over_45:"Over 4.5",btts_yes:"BTTS",btts_no:"BTTS",home_win:"Home Win",away_win:"Away Win",home_no_lose:"DNB",away_no_lose:"DNB"};
+    const mtLabel=OUTCOME_MKT_TYPE[primaryOutcome];
+    const hist=mtLabel?marketHitRates[mtLabel]:null;
+    const histMinSamples=isBTTS?5:8;
+    let histNote=null;
+    if(hist&&hist.t>=histMinSamples){
+      const rate=Math.round((hist.w/hist.t)*100);
+      if(rate>=75){score=Math.min(score+0.5,10);histNote="Historically strong: "+rate+"% hit rate over "+hist.t+" logged picks";}
+      else if(rate<=40){score=Math.max(score-1,0);histNote="Historically weak: "+rate+"% hit rate over "+hist.t+" logged picks — use caution";}
+    }
+    if(score<scoreFloor)continue;
+    const edge=tp-m.implied;
+    const reducers=[];
+    if(histNote)reducers.push(histNote);
+    if(edge<-5)reducers.push("Market implies more than form data");
+    if(div.some(d=>d.toLowerCase().includes((tpKey||"").replace("_",""))))reducers.push("L5 vs L15 diverge on this outcome");
+    if(homeStronger&&posGap>=5&&primaryOutcome==="away_win")reducers.push("Away team "+posGap+" positions below home");
+    if(!homeStronger&&posGap>=5&&primaryOutcome==="home_win")reducers.push("Home team "+posGap+" positions below away");
+    if(std.awayPos>=14&&primaryOutcome==="away_win")reducers.push("Away team in bottom half (pos "+std.awayPos+")");
+    if(xg&&xg>=2.5&&xg<=3.5&&m.label.includes("2.5"))reducers.push("xG in borderline zone ("+xg+")");
+    // Overs only — all other markets removed per calibration
+    const sectionLabel=m.section.replace(/\s*\|\s*full time/i,"").replace(/\s*\|\s*/g," ").trim();
+    const marketName=(sectionLabel?sectionLabel+" — ":"")+m.label;
+    const _mt=getMarketType(marketName);
+    if(_mt==="Other")continue;
+    candidates.push({market:marketName,odds:+parseFloat(m.odds).toFixed(2),_sec:m.section,formPct:tp,impliedPct:m.implied,edge:(edge>0?"+":"")+edge.toFixed(1)+"pt",agreementCount:Math.round(counts[primaryOutcome]||0),reducers,score,confidence:score>=9?"High":score>=8?"Medium":"Low",outcome:primaryOutcome,mode:"engine",verdict:"True probability "+tp+"% vs market implied "+m.implied.toFixed(1)+"%. "+Math.round(counts[primaryOutcome]||0)+" markets in agreement.",trackRate:hist?Math.round((hist.w/hist.t)*100):null,trackN:hist?hist.t:null});
+  }
+
+  const PROXY=['correct score','exact score','handicap','asian','first half','second half','multigoal','winning margin'];
+  const isProxy=s=>PROXY.some(p=>(s||'').toLowerCase().includes(p));
+  const CANON_ODDS={over_25:odds.over_25,over_15:odds.over_15,over_35:odds.over_35,over_45:odds.over_45,under_25:odds.under_25,under_15:odds.under_15,btts_yes:odds.btts_yes,btts_no:odds.btts_no,home_win:odds.home_win,away_win:odds.away_win,home_no_lose:odds.dnb_home,away_no_lose:odds.dnb_away,home_goals:null,away_goals:null,combo:null};
+  const CANON_NAME={over_25:'Over 2.5',over_15:'Over 1.5',over_35:'Over 3.5',over_45:'Over 4.5',over_05:'Over 0.5',under_25:'Under 2.5',under_15:'Under 1.5',btts_yes:'BTTS Yes',btts_no:'BTTS No',goals:'Over 1.5',no_goals:'Under 2.5',home_win:'Home Win (1X2)',away_win:'Away Win (1X2)',home_no_lose:'Draw No Bet — Home',away_no_lose:'Draw No Bet — Away',draw:'Draw (1X2)'};
+  const bestPerOutcome={};
+  for(const c of candidates){const ex=bestPerOutcome[c.outcome];const cp=isProxy(c._sec);const ep=ex?isProxy(ex._sec):true;if(!ex||(!cp&&ep)||(cp===ep&&c.score>ex.score))bestPerOutcome[c.outcome]=c;}
+  const CNAME={over_25:"Over 2.5",over_15:"Over 1.5",over_35:"Over 3.5",over_45:"Over 4.5",over_05:"Over 0.5",under_25:"Under 2.5",under_15:"Under 1.5",under_35:"Under 3.5",btts_yes:"BTTS Yes",btts_no:"BTTS No",goals:"Over 1.5",no_goals:"Under 2.5",home_win:"Home Win (1X2)",away_win:"Away Win (1X2)",home_no_lose:"DNB Home",away_no_lose:"DNB Away",draw:"Draw (1X2)"};
+  const CODD={over_25:odds.over_25,over_15:odds.over_15,over_35:odds.over_35,over_45:odds.over_45,under_25:odds.under_25,under_15:odds.under_15,btts_yes:odds.btts_yes,btts_no:odds.btts_no,home_win:odds.home_win,away_win:odds.away_win,home_no_lose:odds.dnb_home,away_no_lose:odds.dnb_away,home_goals:null,away_goals:null,combo:null};
+  const finalPicks=Object.values(bestPerOutcome)
+    .filter(c=>{
+      // If this outcome has a dedicated canonical odds slot but we never actually
+      // captured that market's real price on this board, don't fall back to
+      // whatever unrelated line triggered the vote (e.g. a handicap or multigoal
+      // line) — drop the pick rather than show a mismatched price.
+      if(Object.prototype.hasOwnProperty.call(CODD,c.outcome))return!!CODD[c.outcome];
+      return true;
+    })
+    .sort((a,b)=>b.score-a.score).slice(0,3).map(c=>{
+    const co=CODD[c.outcome],cn=CNAME[c.outcome]||c.market;
+    const finalOdds=+parseFloat(co).toFixed(2);
+    return{...c,market:cn,odds:finalOdds,impliedPct:+((1/co)*100).toFixed(1)};
+  });
+
+  // ── TEAM GOALS (each team's OWN goals — separate from the match total) ──
+  // Modeled with Poisson from that team's goals-scored/conceded form averages,
+  // since these are genuinely different markets, not just an alternate label.
+  function poissonOverProb(lambda,k){ // P(that team scores more than k goals)
+    if(lambda==null||lambda<0)return null;
+    let cdf=0,term=Math.exp(-lambda);
+    for(let i=0;i<=k;i++){if(i>0)term=term*lambda/i;cdf+=term;}
+    return Math.max(0,Math.min(100,+((1-cdf)*100).toFixed(1)));
+  }
+  function teamGoalsScore(tp,marketOdds){
+    if(tp==null||!marketOdds)return 0;
+    const implied=imp(marketOdds),edge=tp-implied;
+    let base=0;
+    if(tp>=80)base=10;else if(tp>=75)base=9;else if(tp>=70)base=8.5;else if(tp>=65)base=8;else if(tp>=60)base=7;else return 0;
+    if(edge>10)base=Math.min(base+1,10);else if(edge>5)base=Math.min(base+0.5,10);else if(edge<-10)base=Math.max(base-2,0);else if(edge<-5)base=Math.max(base-1,0);
+    return+base.toFixed(1);
+  }
+  const THRESH_K={"05":0,"15":1,"25":2};
+  function bestTeamGoalsPick(side,teamName,lambda,book){
+    if(!book||lambda==null)return null;
+    let best=null;
+    for(const key of Object.keys(book)){
+      const m2=key.match(/^(over|under)_(\d+)$/);
+      if(!m2||!(m2[2]in THRESH_K))continue;
+      const dir=m2[1],k=THRESH_K[m2[2]],oddsVal=book[key];
+      if(dir!=="over")continue; // Over-only engine — never pick a team's Under X.5
+      if(!oddsVal)continue;
+      const overP=poissonOverProb(lambda,k);
+      if(overP==null)continue;
+      const tp=dir==="over"?overP:+((100-overP).toFixed(1));
+      let score=teamGoalsScore(tp,oddsVal);
+      if(score<8)continue;
+      const histTag=side==="home"?"Home Goals":"Away Goals";
+      const hist=marketHitRates[histTag];
+      let histNote=null;
+      if(hist&&hist.t>=8){
+        const rate=Math.round((hist.w/hist.t)*100);
+        if(rate>=75){score=Math.min(score+0.5,10);histNote="Historically strong: "+rate+"% hit rate over "+hist.t+" logged picks";}
+        else if(rate<=40){score=Math.max(score-1,0);histNote="Historically weak: "+rate+"% hit rate over "+hist.t+" logged picks — use caution";}
+      }
+      if(score<8)continue;
+      const label=(dir==="over"?"Over ":"Under ")+(m2[2]==="05"?"0.5":m2[2]==="15"?"1.5":"2.5");
+      const impliedPct=imp(oddsVal),edge=+(tp-impliedPct).toFixed(1);
+      const cand={market:teamName+" — "+(side==="home"?"Home Team":"Away Team")+" "+label,odds:+parseFloat(oddsVal).toFixed(2),formPct:tp,impliedPct,edge:(edge>0?"+":"")+edge+"pt",agreementCount:0,reducers:histNote?["Poisson model from goals-scored/conceded form — not cross-market voted",histNote]:["Poisson model from goals-scored/conceded form — not cross-market voted"],score,confidence:score>=9?"High":score>=8?"Medium":"Low",outcome:side+"_team_goals",mode:"engine",verdict:teamName+" true probability "+tp+"% vs market implied "+impliedPct.toFixed(1)+"% (Poisson, expected goals "+lambda.toFixed(2)+")."};
+      if(!best||cand.score>best.score)best=cand;
+    }
+    return best;
+  }
+  const hg=form&&form.home_goals_scored!=null?form.home_goals_scored:null;
+  const ag=form&&form.away_goals_scored!=null?form.away_goals_scored:null;
+  const hgc=form&&form.home_goals_conceded!=null?form.home_goals_conceded:null;
+  const agc=form&&form.away_goals_conceded!=null?form.away_goals_conceded:null;
+  const homeLambda=hg!=null&&agc!=null?(hg+agc)/2:hg;
+  const awayLambda=ag!=null&&hgc!=null?(ag+hgc)/2:ag;
+  const homeTeamPick=bestTeamGoalsPick("home",odds.homeTeam||"Home",homeLambda,odds.home_team_goals);
+  const awayTeamPick=bestTeamGoalsPick("away",odds.awayTeam||"Away",awayLambda,odds.away_team_goals);
+  if(homeTeamPick)finalPicks.push(homeTeamPick);
+  if(awayTeamPick)finalPicks.push(awayTeamPick);
+
+  return{picks:finalPicks,posGap,expectedGoals:xg,expectedGoals5:sl5.avgGoals,expectedGoals15:sl15.avgGoals};
+}
+
+// ── RENDER HELPERS ──
+const scoreColor=n=>n>=9?"#16a34a":n>=7?"#2563eb":n>=6?"#d97706":"#dc2626";
+const modeTagHTML=()=>"<span class=\"log-mode-tag\">&#x26A1; Engine</span>";
+
+function scoreRingSVG(score){
+  const n=parseFloat(score)||0,col=scoreColor(n),r=28,circ=2*Math.PI*r,fill=(n/10)*circ;
+  return "<svg width=\"70\" height=\"70\" viewBox=\"0 0 70 70\"><circle cx=\"35\" cy=\"35\" r=\""+r+"\" fill=\"none\" stroke=\"rgba(0,0,0,0.08)\" stroke-width=\"6\"/><circle cx=\"35\" cy=\"35\" r=\""+r+"\" fill=\"none\" stroke=\""+col+"\" stroke-width=\"6\" stroke-dasharray=\""+fill+" "+circ+"\" stroke-linecap=\"round\" transform=\"rotate(-90 35 35)\"/><text x=\"35\" y=\"35\" text-anchor=\"middle\" dominant-baseline=\"central\" fill=\""+col+"\" font-family=\"Courier New,monospace\" font-weight=\"800\" font-size=\"17\">"+n+"</text></svg>";
+}
+
+function probBarHTML(label,value,color){
+  const p=Math.min(parseFloat(value)||0,100);
+  return "<div class=\"prob-row\"><div class=\"prob-label\">"+label+"</div><div class=\"prob-track\"><div class=\"prob-fill\" style=\"width:"+p+"%;background:"+color+"\"></div></div><div class=\"prob-val\" style=\"color:"+color+"\">"+( typeof value==="number"?value.toFixed(0)+"%":value)+"</div></div>";
+}
+
+function pickCardHTML(pick,idx,sureLock,verifiedPicks){
+  const ranks=["TOP PICK","2ND PICK","3RD PICK"];
+  const isTeamGoals=pick.outcome==="home_team_goals"||pick.outcome==="away_team_goals";
+  const rankLabel=pick.outcome==="home_team_goals"?"HOME GOALS":pick.outcome==="away_team_goals"?"AWAY GOALS":(ranks[idx]||"PICK "+(idx+1));
+  const mParts=isTeamGoals?(pick.pick||pick.market||"").split("—"):[];
+  const teamName=isTeamGoals&&mParts.length>1?mParts[0].trim():null;
+  const marketDisplay=teamName?mParts[mParts.length-1].trim():(pick.pick||pick.market);
+  const teamTag=teamName?"<span style=\"display:inline-block;margin-left:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(217,119,6,0.12);color:#d97706;border:1px solid rgba(217,119,6,0.3);vertical-align:middle\">&#x2605; "+teamName+"</span>":"";
+  const col=scoreColor(parseFloat(pick.market_score||pick.score));
+  const fp=parseFloat(pick.form_probability||pick.formPct)||0;
+  const ip=parseFloat(pick.implied_probability||pick.impliedPct)||0;
+  const agree=pick.markets_in_agreement||pick.agreementCount||0;
+  const reducers=pick.confidence_reducers||pick.reducers||[];
+  const cs=pick.confidence==="High"?"conf-high":pick.confidence==="Medium"?"conf-med":"conf-low";
+  // BEST BET: score alone can be inflated by cross-market agreement count, so only
+  // flag a pick as a genuine standout when it ALSO carries a wide edge (true
+  // probability vs market implied) — that combination is a much stronger signal
+  // of a real mispricing than score by itself. Not capped at any fixed count —
+  // could be 0, 1, or 2 in a given match.
+  const scoreNum=parseFloat(pick.market_score||pick.score)||0;
+  const edgeNum=Math.abs(parseFloat(String(pick.edge||"").replace(/[^0-9.-]/g,""))||0);
+  const isBestBet=scoreNum>=9&&edgeNum>=15;
+  // SURE LOCK supersedes Best Bet's tag visually on the specific picks that make
+  // up the lock (it already implies the same or stronger conditions) — only ever
+  // true for the 1X2/Over 1.5/Over 2.5 trio when runRulesEngine's buildMatchHTML
+  // confirmed all three at a genuine 10/10.
+  const isSureLockPick=!!(sureLock&&(pick===sureLock.oneXtwo||pick===sureLock.o15||pick===sureLock.o25));
+  const isVerifiedLockPick=!!(verifiedPicks&&verifiedPicks.includes(pick));
+  const bestBetTag=isVerifiedLockPick?"<span style=\"display:inline-block;margin-left:6px;font-size:10px;font-weight:800;letter-spacing:0.06em;padding:2px 8px;border-radius:999px;background:linear-gradient(135deg,#2dd4bf,#0d9488);color:#fff;vertical-align:middle\">&#x2705; VERIFIED LOCK</span>":isSureLockPick?"<span style=\"display:inline-block;margin-left:6px;font-size:10px;font-weight:800;letter-spacing:0.06em;padding:2px 8px;border-radius:999px;background:linear-gradient(135deg,#a78bfa,#7c3aed);color:#fff;vertical-align:middle\">&#x1F48E; SURE LOCK</span>":isBestBet?"<span style=\"display:inline-block;margin-left:6px;font-size:10px;font-weight:800;letter-spacing:0.06em;padding:2px 8px;border-radius:999px;background:linear-gradient(135deg,#f5d76e,#d4a017);color:#3a2a00;vertical-align:middle\">&#x2B50; BEST BET</span>":"";
+  const cardBorder=isVerifiedLockPick?"2px solid #0d9488":isSureLockPick?"2px solid #7c3aed":isBestBet?"2px solid #d4a017":"1px solid transparent";
+  const cardGlow=isVerifiedLockPick?"box-shadow:0 0 0 1px rgba(13,148,136,0.35),0 2px 10px rgba(13,148,136,0.22);":isSureLockPick?"box-shadow:0 0 0 1px rgba(124,58,237,0.3),0 2px 10px rgba(124,58,237,0.2);":isBestBet?"box-shadow:0 0 0 1px rgba(212,160,23,0.25),0 2px 10px rgba(212,160,23,0.18);":"";
+  return "<div class=\"pick-card\"><div class=\"pick-inner\" style=\"border-left-color:"+col+";border:"+cardBorder+";border-left:4px solid "+col+";"+cardGlow+"\">"+
+    "<div class=\"pick-head\" onclick=\"toggleBody("+idx+")\" >"+
+    "<div style=\"flex:1;min-width:0\">"+
+    "<div class=\"pick-rank\" style=\"color:"+col+"\">"+rankLabel+" <span class=\"conf-badge "+cs+"\">"+pick.confidence+"</span>"+bestBetTag+"</div>"+
+    "<div class=\"pick-market\">"+marketDisplay+teamTag+"</div>"+
+    "<div class=\"pick-odds-display\">"+pick.odds+"</div>"+
+    "</div>"+
+    "<div class=\"score-ring-wrap\">"+scoreRingSVG(pick.market_score||pick.score)+"<div class=\"score-ring-label\">/10</div></div>"+
+    "<div class=\"chevron\" id=\"chev"+idx+"\">&#x25BE;</div>"+
+    "</div>"+
+    "<div class=\"pick-body\" id=\"body"+idx+"\" style=\"display:"+(idx===0?"block":"none")+"\">"+
+    "<div class=\"pick-verdict\">"+(pick.verdict||"")+"</div>"+
+    probBarHTML("True probability",fp,"#16a34a")+
+    probBarHTML("Market implied",ip,"#2563eb")+
+    "<div style=\"display:inline-flex;align-items:center;gap:6px;background:rgba(22,163,74,0.08);border:1px solid rgba(22,163,74,0.25);border-radius:6px;padding:4px 10px;margin-bottom:8px;font-size:12px;font-weight:700;color:#16a34a\">"+(pick.edge&&pick.edge!=="--"?"EDGE: "+pick.edge:"Aligned")+"</div>"+
+    "<div class=\"agree-box\"><div class=\"agree-num\">"+agree+"</div><div class=\"agree-label\">markets across the full<br>board in agreement</div></div>"+
+    reducers.map(rv=>"<div class=\"reducer-item\"><span style=\"color:#d97706;font-weight:700;flex-shrink:0\">&#x26A0;</span>"+rv+"</div>").join("")+
+    "</div></div></div>";
+}
+
+function toggleBody(idx){
+  const b=document.getElementById("body"+idx),c=document.getElementById("chev"+idx);
+  const open=b.style.display!=="none";
+  b.style.display=open?"none":"block";
+  c.classList.toggle("open",!open);
+}
+
+function dataFoundHTML(odds,form){
+  const tags=[["1X2 odds",!!odds.home_win],["BTTS odds",!!odds.btts_yes],["Over 2.5 odds",!!odds.over_25],["Win prob",!!odds.bpw_home_pct],["BTTS stat",!!odds.bpw_btts],["Over 2.5 stat",!!odds.bpw_over25],[odds.all_markets.length+" markets",odds.all_markets.length>0],["Form data",!!form]];
+  return "<div class=\"data-found\"><div class=\"data-found-title\">Data extracted</div><div class=\"data-tags\">"+tags.map(([k,ok])=>"<span class=\"data-tag "+(ok?"tag-ok":"tag-miss")+"\">"+( ok?"&#x2713;":"&#x2717;")+" "+k+"</span>").join("")+"</div></div>";
+}
+
+// ── MAIN RUNNER ──
+const STEPS=["Scanning all markets...","Computing implied probabilities...","Counting cross-market votes...","Scoring each outcome...","Applying confidence filters...","Ranking picks..."];
+
+function splitMultiMatchOdds(raw,maxMatches){
+  // Each individual match's paste has its two team-name lines immediately
+  // followed by a line that is exactly "Football//" — that marker is the anchor
+  // parseOddsBoard already uses to find team names. When several matches are
+  // pasted back-to-back in one box, we find every such anchor and slice the
+  // text into one block per match, from its team-name line up to (but not
+  // including) the next match's team-name line.
+  const lines=raw.split("\n");
+  const anchors=[];
+  for(let i=2;i<lines.length;i++){if(lines[i].trim()==="Football//")anchors.push(i-2);}
+  if(anchors.length<=1)return[raw];
+  const blocks=[];
+  for(let i=0;i<anchors.length&&blocks.length<maxMatches;i++){
+    const start=Math.max(anchors[i],0);
+    const end=i+1<anchors.length?anchors[i+1]:lines.length;
+    blocks.push(lines.slice(start,end).join("\n"));
+  }
+  return blocks;
+}
+function analyzeOne(oddsText,formText,form15Text,cal){
+  const odds=parseOddsBoard(oddsText);
+  const form5=parseFormData(formText||"");
+  const form15=parseFormData(form15Text||"");
+  const form=mergeFormWindows(form5,form15);
+  let result;
+  try{
+    const _r=runRulesEngine(odds,form,formText||"",form15Text||"",cal);
+    result={match:odds.match||"Unknown Match",homeTeam:odds.homeTeam||null,awayTeam:odds.awayTeam||null,expectedGoals:_r.expectedGoals!=null?+_r.expectedGoals.toFixed(2):null,expectedGoals5:_r.expectedGoals5!=null?+_r.expectedGoals5.toFixed(2):null,expectedGoals15:_r.expectedGoals15!=null?+_r.expectedGoals15.toFixed(2):null,picks:_r.picks,_mkt:odds.all_markets.length,no_pick_reason:_r.picks.length===0?"Over 2.5 does not qualify. Skip this match.":""};
+  }catch(e){
+    result={match:odds.match||"Unknown Match",homeTeam:odds.homeTeam||null,awayTeam:odds.awayTeam||null,expectedGoals:null,expectedGoals5:null,expectedGoals15:null,picks:[],no_pick_reason:"Engine error: "+e.message};
+  }
+  return{result,odds,form};
+}
+// One box now carries both windows: paste Last 5 first, a blank line, then Last
+// 15. Split on the first blank line — if there isn't one, treat the whole paste
+// as Last 5 only (keeps old single-window pastes working unchanged).
+function splitFormInput(raw){
+  if(!raw||!raw.trim())return{l5:"",l15:""};
+  // mutating.com's page text has blank lines scattered all through it (table
+  // section gaps), so "split on the first blank line" cuts L5 off far too early
+  // and dumps the rest — including all of L15 — into the L15 bucket. Instead,
+  // look for where the page's own header repeats: every mutating.com dump opens
+  // with the same 3-line title block (site name x2 + match name), so when L5 and
+  // L15 are pasted back-to-back that block appears a second time right where L15
+  // starts. Splitting there is exact, regardless of how many blank lines sit
+  // inside either half.
+  const lines=raw.split("\n");
+  const headerIdxs=[];
+  for(let i=0;i<lines.length&&headerIdxs.length<3;i++){if(lines[i].trim()!=="")headerIdxs.push(i);}
+  let splitIdx=-1;
+  if(headerIdxs.length===3){
+    const h=headerIdxs.map(i=>lines[i].trim());
+    for(let i=headerIdxs[0]+1;i<lines.length-2;i++){
+      if(lines[i].trim()===h[0]&&lines[i+1].trim()===h[1]&&lines[i+2].trim()===h[2]){splitIdx=i;break;}
+    }
+  }
+  if(splitIdx>0)return{l5:lines.slice(0,splitIdx).join("\n"),l15:lines.slice(splitIdx).join("\n")};
+  // Fallback for non-mutating pastes (no repeated header found): old blank-line split.
+  const parts=raw.split(/\n\s*\n/);
+  if(parts.length<2)return{l5:raw,l15:""};
+  return{l5:parts[0],l15:parts.slice(1).join("\n\n")};
+}
+
+async function fetchMutating(){
+  const st=document.getElementById("fetchStatus"), fb=document.getElementById("fetchBtn");
+  try{
+    const raw=document.getElementById("oddsInput").value;
+    if(!raw.trim()){st.textContent="Paste the odds board first.";return;}
+    const b=parseOddsBoard(splitMultiMatchOdds(raw,5)[0]);
+    const h=b.homeTeam||b.home, a=b.awayTeam||b.away;
+    if(!h||!a){st.textContent="Couldn't read team names from the odds board.";return;}
+    fb.disabled=true; st.textContent="Fetching "+h+" v "+a+" ...";
+    const r=await fetch("/.netlify/functions/mutating?home="+encodeURIComponent(h)+"&away="+encodeURIComponent(a));
+    const j=await r.json();
+    if(!j.ok){st.textContent="Not fetched: "+j.reason+". Paste manually.";console.log(j);return;}
+    document.getElementById("formInput").value=j.text5+"\n\n"+j.text15;
+    st.textContent="Filled for "+j.home+" v "+j.away+(j.approx?" (APPROXIMATE: "+(j.notes||[]).join(" ")+")":" (Last 5 + Last 15, exact)")+". Applies to match 1 only.";
+  }catch(e){st.textContent="Fetch failed: "+e.message;}
+  finally{fb.disabled=false;}
+}
+function runAnalysis(){
+  const rawOdds=document.getElementById("oddsInput").value;
+  const rawForm=document.getElementById("formInput").value;
+  const{l5:formText,l15:form15Text}=splitFormInput(rawForm);
+  if(!rawOdds.trim()){showError("Paste the odds board first.");return;}
+  hideError();
+  document.getElementById("runBtn").disabled=true;
+  document.getElementById("inputSection").style.display="none";
+  document.getElementById("resetBtn").style.display="flex";
+  const thinking=document.getElementById("thinkingBox");
+  const thinkingText=document.getElementById("thinkingText");
+  thinking.style.display="flex";
+  let si=0;thinkingText.textContent=STEPS[0];
+  const iv=setInterval(()=>{si=Math.min(si+1,STEPS.length-1);thinkingText.textContent=STEPS[si];},700);
+  const cal=calibrate(loadLog()).byMarket;
+  const blocks=splitMultiMatchOdds(rawOdds,5);
+  // Only the FIRST detected match carries the Last 5/Last 15 form boxes (if filled);
+  // every match after that in the same paste runs odds-only.
+  const outcomes=blocks.map((b,i)=>analyzeOne(b,i===0?formText:"",i===0?form15Text:"",cal));
+  clearInterval(iv);thinking.style.display="none";
+  let log=loadLog();
+  for(const{result}of outcomes){
+    const entry={id:Date.now()+Math.floor(Math.random()*1000),date:new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}),match:result.match,homeTeam:result.homeTeam,awayTeam:result.awayTeam,expectedGoals:result.expectedGoals,expectedGoals5:result.expectedGoals5,expectedGoals15:result.expectedGoals15,mode:"engine"};
+    if(result.picks&&result.picks.length>0){
+      log=[{...entry,picks:result.picks.map(p=>({pick:p.market||p.pick,odds:p.odds,score:p.score,confidence:p.confidence,edge:p.edge,trackRate:p.trackRate!=null?p.trackRate:null,trackN:p.trackN!=null?p.trackN:null,result:"pending"}))},...log];
+    }else{
+      // No qualifying picks — still logged, but flagged so it shows in the
+      // separate "No-Pick Matches" list instead of the main picks list. This is
+      // just a reminder tray: a match you scanned and the engine rejected, so you
+      // know to pull it from your slip if you'd already added it elsewhere.
+      log=[{...entry,noPick:true,reason:result.no_pick_reason||"No market scored high enough.",picks:[]},...log];
+    }
+  }
+  saveLog(log);
+  renderResult(outcomes);
+}
+
+function buildMatchHTML(result,odds,form){
+  const noPick=!result.picks||result.picks.length===0||result.no_pick_reason;
+  // Show both windows' goal averages when both were pasted, rather than quietly
+  // picking one — a single number can hide a wide L5/L15 disagreement (small
+  // sample spike vs a more stable long-run average).
+  const xgTag=(result.expectedGoals5!=null&&result.expectedGoals15!=null)
+    ? " &middot; L5: ~"+result.expectedGoals5+" xG &middot; L15: ~"+result.expectedGoals15+" xG"
+    : result.expectedGoals!=null?" &middot; ~"+result.expectedGoals+" xG":"";
+  let html="<div class='result-banner'><div class='result-eye'>&#x26A1; Oracle &mdash; "+(noPick?"no qualifying picks":(result.picks.length+" pick"+(result.picks.length!==1?"s":"")+" found"))+"</div><div class='result-match'>"+result.match+"</div><div class='result-mode'>&#x26A1; Rules Engine &mdash; "+(result._mkt||0)+" markets scanned"+xgTag+"</div></div>";
+  const goalsLock=!noPick&&(()=>{
+    const o15=result.picks.find(p=>(p.market||p.pick||"").toLowerCase().includes("over 1.5"));
+    const o25=result.picks.find(p=>(p.market||p.pick||"").toLowerCase().includes("over 2.5"));
+    if(o15&&o25){const s15=parseFloat(o15.market_score||o15.score||0),s25=parseFloat(o25.market_score||o25.score||0);if(s15>=9&&s25>=8)return{o15,o25,both10:s15>=10&&s25>=10};}
+    return null;
+  })();
+  // SURE LOCK — the rarest, strictest confirmation: 1X2 + Over 1.5 + Over 2.5 ALL
+  // present in the same match AND every one of them a genuine 10/10 (not just
+  // qualifying). This sits above Best Bet and Goals Lock, not instead of them.
+  const sureLock=!noPick&&(()=>{
+    const is10=p=>(parseFloat(p.market_score||p.score)||0)>=9.95;
+    const oneXtwo=result.picks.find(p=>{const t=(p.market||p.pick||"").toLowerCase();return t.includes("1x2")&&(t.includes("home win")||t.includes("away win"));});
+    const o15=result.picks.find(p=>(p.market||p.pick||"").toLowerCase().includes("over 1.5"));
+    const o25=result.picks.find(p=>(p.market||p.pick||"").toLowerCase().includes("over 2.5"));
+    if(oneXtwo&&o15&&o25&&is10(oneXtwo)&&is10(o15)&&is10(o25))return{oneXtwo,o15,o25};
+    return null;
+  })();
+  // VERIFIED LOCK — the one tier above Sure Lock, and NOT limited to the 1X2 +
+  // Over 1.5 + Over 2.5 trio: ANY market qualifies on its own if it (a) hits the
+  // engine's ceiling today (genuine 9.95+/10, not just a qualifying score) AND
+  // (b) that exact market type has a real, logged win rate — not today's
+  // numbers, but what it has actually done across enough of your own confirmed
+  // results. A lone BTTS or Home Goals pick can earn this just as much as the
+  // 1X2/Over trio can. Nothing here claims a pick can't lose; it just refuses to
+  // show this badge on a hunch, however high the score looks.
+  const VERIFIED_RATE_MIN=85,VERIFIED_N_MIN=10;
+  const isVerifiedPick=p=>(parseFloat(p.market_score||p.score)||0)>=9.95&&p.trackRate!=null&&p.trackN!=null&&p.trackRate>=VERIFIED_RATE_MIN&&p.trackN>=VERIFIED_N_MIN;
+  const verifiedPicks=!noPick?result.picks.filter(isVerifiedPick):[];
+  const verifiedLock=verifiedPicks.length>0;
+  if(noPick){
+    html+="<div class='no-pick'><div class='no-pick-icon'>&#x1F6AB;</div><div class='no-pick-title'>No Pick</div><div class='no-pick-reason'>"+(result.no_pick_reason||"No market scored 7/10+. Skip this match.")+"</div></div>";
+  }else{
+    if(verifiedLock)html+="<div style='background:linear-gradient(135deg,rgba(13,148,136,0.16),rgba(124,58,237,0.06));border:2px solid rgba(13,148,136,0.55);border-radius:14px;padding:14px 18px;margin-bottom:14px;position:relative;overflow:hidden;'><div style='position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#0d9488,#7c3aed,#0d9488);'></div><div style='font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:#0d9488;font-weight:800;margin-bottom:6px;'>&#x2705; VERIFIED LOCK — MAX SCORE + PROVEN TRACK RECORD</div><div style='font-size:14px;font-weight:700;color:var(--ink)'>"+(verifiedPicks.length>1?"These picks are":"This pick is")+" maxed out today, AND "+(verifiedPicks.length>1?"each of these exact markets has":"this exact market has")+" hit "+VERIFIED_RATE_MIN+"%+ across "+VERIFIED_N_MIN+"+ of your own logged picks — not just a high score, a proven pattern. No pick is ever certain to win, but this is as strong as the evidence gets.</div><div style='display:flex;gap:10px;margin-top:10px;flex-wrap:wrap'>"+verifiedPicks.map(p=>"<span style='background:rgba(13,148,136,0.15);border:1px solid rgba(13,148,136,0.4);border-radius:8px;padding:6px 14px;font-family:Courier New,monospace;font-weight:800;font-size:1rem;color:#0d9488'>"+(p.market||p.pick)+" @ "+p.odds+" &middot; "+p.trackRate+"% ("+p.trackN+")</span>").join("")+"</div></div>";
+    else if(sureLock)html+="<div style='background:linear-gradient(135deg,rgba(124,58,237,0.14),rgba(212,160,23,0.06));border:2px solid rgba(124,58,237,0.5);border-radius:14px;padding:14px 18px;margin-bottom:14px;position:relative;overflow:hidden;'><div style='position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#7c3aed,#d4a017,#7c3aed);'></div><div style='font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:#7c3aed;font-weight:800;margin-bottom:6px;'>&#x1F48E; SURE LOCK — 1X2 + OVER 1.5 + OVER 2.5 ALL 10/10</div><div style='font-size:14px;font-weight:700;color:var(--ink)'>Result and both goals thresholds all maxed out. The strongest alignment this engine can produce.</div><div style='display:flex;gap:10px;margin-top:10px;flex-wrap:wrap'><span style='background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.4);border-radius:8px;padding:6px 14px;font-family:Courier New,monospace;font-weight:800;font-size:1rem;color:#7c3aed'>1X2 @ "+sureLock.oneXtwo.odds+"</span><span style='background:rgba(22,163,74,0.15);border:1px solid rgba(22,163,74,0.4);border-radius:8px;padding:6px 14px;font-family:Courier New,monospace;font-weight:800;font-size:1rem;color:#16a34a'>Over 1.5 @ "+sureLock.o15.odds+"</span><span style='background:rgba(37,99,235,0.12);border:1px solid rgba(37,99,235,0.3);border-radius:8px;padding:6px 14px;font-family:Courier New,monospace;font-weight:800;font-size:1rem;color:#2563eb'>Over 2.5 @ "+sureLock.o25.odds+"</span></div></div>";
+    else if(goalsLock)html+="<div style='background:linear-gradient(135deg,rgba(22,163,74,0.12),rgba(22,163,74,0.04));border:2px solid rgba(22,163,74,0.4);border-radius:14px;padding:14px 18px;margin-bottom:14px;position:relative;overflow:hidden;'><div style='position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#16a34a,#22c55e,#16a34a);'></div><div style='font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:#16a34a;font-weight:800;margin-bottom:6px;'>"+(goalsLock.both10?"&#x1F512; GOALS LOCK — 10/10 + 10/10":"&#x1F512; GOALS LOCK — STRONG SIGNAL")+"</div><div style='font-size:14px;font-weight:700;color:var(--ink)'>Over 1.5 &amp; Over 2.5 both confirmed. All goals markets aligned.</div><div style='display:flex;gap:10px;margin-top:10px;flex-wrap:wrap'><span style='background:rgba(22,163,74,0.15);border:1px solid rgba(22,163,74,0.4);border-radius:8px;padding:6px 14px;font-family:Courier New,monospace;font-weight:800;font-size:1.1rem;color:#16a34a'>Over 1.5 @ "+goalsLock.o15.odds+"</span><span style='background:rgba(37,99,235,0.12);border:1px solid rgba(37,99,235,0.3);border-radius:8px;padding:6px 14px;font-family:Courier New,monospace;font-weight:800;font-size:1.1rem;color:#2563eb'>Over 2.5 @ "+goalsLock.o25.odds+"</span></div></div>";
+    html+=result.picks.map((p,i)=>pickCardHTML(p,i,sureLock,verifiedPicks)).join("");
+  }
+  if(odds)html+=dataFoundHTML(odds,form);
+  return html;
+}
+function renderResult(results){
+  // Accepts either one {result,odds,form} object (single match) or an array of
+  // them (multiple odds boards pasted at once) — rendered stacked, each with its
+  // own banner/picks/data-extracted footer, divided for readability.
+  const list=Array.isArray(results)?results:[results];
+  let html=list.map((r,i)=>buildMatchHTML(r.result,r.odds,r.form)+(i<list.length-1?"<div style='height:10px;border-bottom:1px dashed var(--bd);margin-bottom:18px'></div>":"")).join("");
+  html+="<div class='footer-note'>OddsOracle scans all goals markets. Score floor 7/10. Min odds 1.10. Singles only. 25+ only.</div>";
+  document.getElementById("resultSection").innerHTML=html;
+  document.getElementById("resultSection").style.display="block";
+}
+
+// ── ML CALIBRATION ──
+function getMarketType(pick){
+  if(!pick)return"Other";const p=pick.toLowerCase();
+  // Team goals — must be checked BEFORE the generic Over/Under checks below,
+  // otherwise "Home Team Over 1.5" gets misread as the plain match-total "Over 1.5".
+  if((p.includes("home team")||p.includes("team 1"))&&(p.includes("over")||p.includes("under")))return"Home Goals";
+  if((p.includes("away team")||p.includes("team 2"))&&(p.includes("over")||p.includes("under")))return"Away Goals";
+  if(p.includes("draw no bet")||p.includes("dnb"))return"DNB";
+  if(p.includes("double chance"))return"DC";
+  if(p.includes("handicap"))return"Handicap";
+  if(p.startsWith("both teams to score")||p.startsWith("btts")||p.includes("both teams to score —"))return"BTTS";
+  if(p.includes("both teams to score")&&!p.includes("score in both"))return"BTTS";
+  if(p.includes("over 0.5"))return"Over 0.5";
+  if(p.includes("over 1.5"))return"Over 1.5";
+  if(p.includes("over 2.5"))return"Over 2.5";
+  if(p.includes("over 3.5"))return"Over 3.5";
+  if(p.includes("over 4.5"))return"Over 4.5";
+  if(p.includes("under 1.5"))return"Under 1.5";
+  if(p.includes("under 2.5"))return"Under 2.5";
+  if(p.includes("under 3.5"))return"Under 3.5";
+  if(p.includes("1x2"))return"1X2";
+  if(p.includes("home win"))return"Home Win";
+  if(p.includes("away win"))return"Away Win";
+  if(p.includes("first half")||p.includes("half time"))return"Half Time";
+  if(p.includes("corner"))return"Corners";
+  if(p.includes("booking")||p.includes("card"))return"Cards";
+  if(p.includes("score in both")||p.includes("goal in both"))return"Both Halves";
+  if(p.includes("win to nil")||p.includes("win either"))return"Win Markets";
+  // Combo markets
+  if(p.includes("1x2")&&(p.includes("over")||p.includes("under")||p.includes("btts")))return"Combo";
+  if(p.includes("and over")||p.includes("and under")||p.includes("and btts"))return"Combo";
+  return"Other";
+}
+
+function calibrate(log){
+  const byScore={},byMarket={},byPattern={},byPatternMatches={};
+  for(const entry of log){
+    const picks=entry.picks||[];
+    // PATTERN = the combination of market TYPES that showed up together in this
+    // match (e.g. "Over 1.5 + Over 2.5 + BTTS" vs "1X2 + DNB + Over 1.5") —
+    // groups by the shape of the pick set, not any single market in isolation.
+    const patternKey=[...new Set(picks.map(p=>getMarketType(p.pick)))].sort().join(" + ");
+    const homeT=entry.homeTeam||(entry.match?entry.match.split(" vs ")[0]:"")||"";
+    const awayT=entry.awayTeam||(entry.match?entry.match.split(" vs ")[1]:"")||"";
+    for(const pick of picks){
+      if(pick.result==="pending")continue;
+      const won=pick.result==="win";
+      const score=Math.round(parseFloat(pick.score)||0);
+      const mt=getMarketType(pick.pick);
+      if(!byScore[score])byScore[score]={w:0,t:0};
+      byScore[score].w+=won?1:0;byScore[score].t++;
+      if(!byMarket[mt])byMarket[mt]={w:0,t:0};
+      byMarket[mt].w+=won?1:0;byMarket[mt].t++;
+      if(patternKey){
+        if(!byPattern[patternKey])byPattern[patternKey]={w:0,t:0};
+        byPattern[patternKey].w+=won?1:0;byPattern[patternKey].t++;
+        // Keep the actual matches behind each pattern's number, so the sample
+        // size can be checked by eye instead of just trusted at face value.
+        if(!byPatternMatches[patternKey])byPatternMatches[patternKey]=[];
+        byPatternMatches[patternKey].push({id:entry.id,homeTeam:homeT,awayTeam:awayT,pick:pick.pick,odds:pick.odds,score:pick.score,result:pick.result});
+      }
+    }
+  }
+  return{byScore,byMarket,byPattern,byPatternMatches};
+}
+
+// ── IMPORT / BACKTEST ──
+let statsBoxOpen=false;
+function toggleStatsBox(){statsBoxOpen=!statsBoxOpen;renderLog();}
+function toggleImportBox(){
+  const b=document.getElementById("importBody"),c=document.getElementById("importChev");
+  const open=b.style.display!=="none";
+  b.style.display=open?"none":"block";
+  c.innerHTML=open?"&#x25BE;":"&#x25B4;";
+}
+function parseImportedResults(raw){
+  if(!raw||!raw.trim())return[];
+  const blocks=raw.split(/\n\s*\n/).map(b=>b.trim()).filter(b=>b);
+  const entries=[];
+  for(const block of blocks){
+    const lines=block.split("\n").map(l=>l.trim()).filter(l=>l);
+    if(lines.length===0)continue;
+    let match="Unknown Match",homeTeam=null,awayTeam=null,startIdx=0;
+    const mHead=lines[0].match(/^match:\s*(.+)$/i);
+    if(mHead){
+      match=mHead[1].trim();
+      const vs=match.split(/\s+vs\s+/i);
+      if(vs.length===2){homeTeam=vs[0].trim();awayTeam=vs[1].trim();}
+      startIdx=1;
+    }
+    const picks=[];
+    for(let i=startIdx;i<lines.length;i++){
+      // "Pick text @ odds | score/10 | WIN/LOSS/PENDING"
+      const pm=lines[i].match(/^(.+?)\s*@\s*([0-9]+\.?[0-9]*)\s*\|\s*([0-9]+\.?[0-9]*)\s*(?:\/\s*10)?\s*\|\s*(win|w|loss|l|pending)\b/i);
+      if(!pm)continue;
+      const resRaw=pm[4].toLowerCase();
+      const result=resRaw.startsWith("w")?"win":resRaw.startsWith("l")?"loss":"pending";
+      const score=+parseFloat(pm[3]).toFixed(1);
+      picks.push({pick:pm[1].trim(),odds:+parseFloat(pm[2]).toFixed(2),score,confidence:score>=9?"High":score>=8?"Medium":"Low",result});
+    }
+    if(picks.length===0)continue;
+    entries.push({id:Date.now()+Math.floor(Math.random()*100000)+entries.length,date:"Imported",match,homeTeam,awayTeam,expectedGoals:null,mode:"engine",picks});
+  }
+  return entries;
+}
+function importResults(mode){
+  const raw=document.getElementById("importInput").value;
+  const parsed=parseImportedResults(raw);
+  const msgEl=document.getElementById("importMsg");
+  if(parsed.length===0){msgEl.style.color="#dc2626";msgEl.textContent="Nothing recognized — check the format matches the example above.";return;}
+  const pickCount=parsed.reduce((s,e)=>s+e.picks.length,0);
+  if(mode==="replace"){
+    saveLog(parsed);
+    msgEl.style.color="#16a34a";
+    msgEl.textContent="Started over — log replaced with "+parsed.length+" match"+(parsed.length!==1?"es":"")+" ("+pickCount+" picks) for backtesting.";
+  }else{
+    saveLog([...parsed,...loadLog()]);
+    msgEl.style.color="#16a34a";
+    msgEl.textContent="Appended "+parsed.length+" match"+(parsed.length!==1?"es":"")+" ("+pickCount+" picks) to the existing log.";
+  }
+  document.getElementById("importInput").value="";
+  renderLog();
+}
+
+// ── LOG ──
+function toggleMktList(id){
+  const rows=document.querySelectorAll(".mkt-row-"+id);
+  const btn=document.getElementById("btn_"+id);
+  const hidden=[...rows].filter(r=>r.style.display==="none");
+  if(hidden.length>0){hidden.forEach(r=>r.style.display="");btn.textContent="Show less";}
+  else{[...rows].forEach((r,i)=>{if(i>=5)r.style.display="none";});btn.textContent="Show all";}
+}
+function togglePatternMatches(rowId){
+  const b=document.getElementById("pm_"+rowId),c=document.getElementById("chevpm_"+rowId);
+  if(!b)return;
+  const open=b.style.display!=="none";
+  b.style.display=open?"none":"block";
+  if(c)c.innerHTML=open?"&#x25BE;":"&#x25B4;";
+}
+
+let noPickBoxOpen=false;
+function toggleNoPickBox(){noPickBoxOpen=!noPickBoxOpen;renderLog();}
+let over25BoxOpen=false;
+function toggleOver25Box(){over25BoxOpen=!over25BoxOpen;renderLog();}
+function renderLog(){
+  const rawLog=loadLog();
+  // Favorited matches float to the top; otherwise keep the existing (newest-first) order.
+  const fullLog=[...rawLog].sort((a,b)=>(b.favorite?1:0)-(a.favorite?1:0));
+  // No-pick matches (the engine rejected every market) are logged as a reminder
+  // tray, not mixed into the main picks list — split them out here.
+  const log=fullLog.filter(e=>!e.noPick);
+  const noPickLog=fullLog.filter(e=>e.noPick);
+  const cal=calibrate(log);
+  const wins=log.flatMap(e=>e.picks||[]).filter(p=>p.result==="win").length;
+  const losses=log.flatMap(e=>e.picks||[]).filter(p=>p.result==="loss").length;
+  const total=wins+losses;
+  const hitRate=total>0?Math.round((wins/total)*100):null;
+  let statsHTML="<div class=\"log-stats\">"+
+    "<div class=\"stat-box\"><div class=\"stat-val\" style=\"color:var(--silver)\">"+log.length+"</div><div class=\"stat-lbl\">Matches</div></div>"+
+    "<div class=\"stat-box\"><div class=\"stat-val\" style=\"color:var(--green)\">"+wins+"</div><div class=\"stat-lbl\">Wins</div></div>"+
+    "<div class=\"stat-box\"><div class=\"stat-val\" style=\"color:"+(hitRate==null?"var(--muted)":hitRate>=65?"var(--green)":hitRate>=50?"var(--silver)":"var(--red)")+"\">"+( hitRate!=null?hitRate+"%":"&mdash;")+"</div><div class=\"stat-lbl\">Hit Rate</div></div>"+
+    "</div>";
+  if(total>=10){
+    statsHTML+="<div class=\"cal-section\"><div class=\"cal-title\">&#x1F9E0; ML Calibration &mdash; "+total+" results</div>";
+    statsHTML+="<div style=\"font-size:11px;color:var(--dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em\">By Score Level</div>";
+    [10,9,8,7,6].forEach(s=>{const d=cal.byScore[s];if(!d||d.t===0)return;const r=Math.round((d.w/d.t)*100);statsHTML+="<div class=\"cal-row\"><div class=\"cal-label\">"+s+"/10</div><div class=\"cal-bar-wrap\"><div class=\"cal-bar-fill\" style=\"width:"+r+"%;background:"+scoreColor(s)+"\"></div></div><div class=\"cal-pct\" style=\"color:"+scoreColor(s)+"\">"+r+"%</div><div class=\"cal-n\">("+d.t+")</div></div>";});
+    const mktEntries=Object.entries(cal.byMarket).filter(([k,d])=>d.t>=1).sort((a,b)=>(b[1].w/b[1].t)-(a[1].w/a[1].t));
+    const mktId="mkt_"+Date.now();
+    statsHTML+="<div style=\"display:flex;align-items:center;justify-content:space-between;margin:10px 0 6px\"><div style=\"font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em\">By Market Type</div><button onclick=\"toggleMktList('"+mktId+"')\" style=\"background:transparent;border:1px solid var(--bd);border-radius:6px;padding:3px 10px;font-size:11px;color:var(--muted);cursor:pointer\" id=\"btn_"+mktId+"\">Show all</button></div>";
+    mktEntries.forEach(([k,d],i)=>{const r=Math.round((d.w/d.t)*100);const col=r>=80?"#16a34a":r>=70?"#2563eb":r>=60?"#d97706":"#dc2626";statsHTML+="<div class=\"cal-row mkt-row-"+mktId+"\" style=\""+(i>=5?"display:none":"")+"\" ><div class=\"cal-label\" style=\"width:90px;font-size:11.5px\">"+k+"</div><div class=\"cal-bar-wrap\"><div class=\"cal-bar-fill\" style=\"width:"+r+"%;background:"+col+"\"></div></div><div class=\"cal-pct\" style=\"color:"+col+"\">"+r+"%</div><div class=\"cal-n\">("+d.t+")</div></div>";});
+    // Groups results by the actual odds taken — helps spot whether misses cluster
+    // in a particular price band (e.g. heavy favorites vs mid-range prices)
+    // rather than just by score or market type.
+    // Groups by the COMBINATION of market types that appeared together in the
+    // match (e.g. "Over 1.5 + Over 2.5 + BTTS" vs "1X2 + DNB + Over 1.5") — this
+    // is the actual match "shape", since a single market's hit rate can look fine
+    // while the particular combo it tends to show up alongside underperforms.
+    const patEntries=Object.entries(cal.byPattern).filter(([k,d])=>d.t>=1).sort((a,b)=>b[1].t-a[1].t);
+    if(patEntries.length>0){
+      const patId="pat_"+Date.now();
+      statsHTML+="<div style=\"display:flex;align-items:center;justify-content:space-between;margin:10px 0 6px\"><div style=\"font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em\">By Pick Pattern</div>"+(patEntries.length>5?"<button onclick=\"toggleMktList('"+patId+"')\" style=\"background:transparent;border:1px solid var(--bd);border-radius:6px;padding:3px 10px;font-size:11px;color:var(--muted);cursor:pointer\" id=\"btn_"+patId+"\">Show all</button>":"")+"</div>";
+      patEntries.forEach(([k,d],i)=>{
+        const r=Math.round((d.w/d.t)*100);
+        const col=r>=80?"#16a34a":r>=70?"#2563eb":r>=60?"#d97706":"#dc2626";
+        const rowId=patId+"_"+i;
+        // Tap a pattern row to expand the actual matches behind its sample size —
+        // lets you check a big-looking percentage isn't really just 2-3 matches.
+        statsHTML+="<div class=\"cal-row mkt-row-"+patId+"\" style=\"cursor:pointer;"+(i>=5?"display:none":"")+"\" onclick=\"togglePatternMatches('"+rowId+"')\">"+
+          "<div class=\"cal-label\" style=\"width:150px;font-size:11px;white-space:normal;line-height:1.3\">"+k+"</div>"+
+          "<div class=\"cal-bar-wrap\"><div class=\"cal-bar-fill\" style=\"width:"+r+"%;background:"+col+"\"></div></div>"+
+          "<div class=\"cal-pct\" style=\"color:"+col+"\">"+r+"%</div>"+
+          "<div class=\"cal-n\">("+d.t+")</div>"+
+          "<div style=\"font-size:9px;color:var(--dim);margin-left:3px\" id=\"chevpm_"+rowId+"\">&#x25BE;</div>"+
+          "</div>";
+        const matches=cal.byPatternMatches[k]||[];
+        // Group by the originating match so a pattern like "Over 1.5 + Over 2.5"
+        // shows both picks from the same match under one card, styled the same
+        // as the main Log list (badge pill, odds, score, colored result) instead
+        // of a plain one-line-per-pick list.
+        const grouped={};
+        matches.forEach(m=>{
+          if(!grouped[m.id])grouped[m.id]={homeTeam:m.homeTeam,awayTeam:m.awayTeam,picks:[]};
+          grouped[m.id].picks.push(m);
+        });
+        statsHTML+="<div id=\"pm_"+rowId+"\" style=\"display:none;padding:8px 0 6px\">"+
+          Object.values(grouped).map(g=>{
+            return "<div class=\"log-entry\" style=\"margin-bottom:8px;box-shadow:none\">"+
+              "<div class=\"log-head\" style=\"padding:9px 12px 6px\">"+
+              "<div style=\"font-size:12.5px;font-weight:700;color:var(--ink)\">"+g.homeTeam+" <span style=\"color:var(--dim);font-weight:500\">vs</span> "+g.awayTeam+"</div>"+
+              "</div>"+
+              "<div class=\"log-picks\">"+g.picks.map(p=>{
+                const mt=getMarketType(p.pick);
+                const resColor=p.result==="win"?"#16a34a":p.result==="loss"?"#dc2626":"#9090a8";
+                return "<div class=\"log-pick-row\">"+
+                  "<div style=\"flex:1;min-width:0\">"+
+                  "<div style=\"display:flex;align-items:center;gap:6px;flex-wrap:wrap\">"+
+                  "<span style=\"font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;padding:2px 7px;border-radius:999px;background:rgba(37,99,235,0.1);color:#2563eb;border:1px solid rgba(37,99,235,0.2)\">"+mt+"</span>"+
+                  "<span style=\"font-family:Courier New,monospace;font-size:12px;font-weight:700;color:var(--silver)\">"+p.odds+"</span>"+
+                  "<span style=\"font-family:Courier New,monospace;font-size:11px;color:var(--muted)\">"+p.score+"/10</span>"+
+                  "</div></div>"+
+                  "<div style=\"font-size:11px;font-weight:700;color:"+resColor+";flex-shrink:0\">"+p.result.toUpperCase()+"</div>"+
+                  "</div>";
+              }).join("")+
+              "</div></div>";
+          }).join("")+
+          "</div>";
+      });
+    }
+    statsHTML+="</div>";
+  }
+  if(noPickLog.length>0){
+    statsHTML+="<div style=\"background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;margin-bottom:14px;overflow:hidden\">"+
+      "<div onclick=\"toggleNoPickBox()\" style=\"padding:11px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer\">"+
+      "<div style=\"font-size:12.5px;font-weight:700;color:var(--muted)\">&#x1F6AB; No-Pick Matches ("+noPickLog.length+")</div>"+
+      "<div style=\"font-size:11px;color:var(--dim)\">"+(noPickBoxOpen?"&#x25B4;":"&#x25BE;")+"</div></div>";
+    if(noPickBoxOpen){
+      statsHTML+="<div style=\"padding:0 14px 10px\">"+noPickLog.map(entry=>{
+        const homeT=entry.homeTeam||(entry.match?entry.match.split(" vs ")[0]:"")||"";
+        const awayT=entry.awayTeam||(entry.match?entry.match.split(" vs ")[1]:"")||"";
+        return "<div style=\"display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 0;border-top:1px solid var(--s3)\">"+
+          "<div style=\"min-width:0\"><div style=\"font-size:12.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap\">"+homeT+" <span style=\"color:var(--dim);font-weight:500\">vs</span> "+awayT+"</div>"+
+          "<div style=\"font-size:11px;color:var(--dim);margin-top:1px\">"+(entry.reason||"No qualifying market")+"</div></div>"+
+          "<button class=\"del-btn\" onclick=\"delEntry("+entry.id+")\" >&#x1F5D1;</button></div>";
+      }).join("")+"</div>";
+    }
+    statsHTML+="</div>";
+  }
+  // OVER 2.5 CONFIRMED — every match where the engine produced a qualifying
+  // Over 2.5 pick, listed separately so it's easy to scan just that market
+  // without digging through the full mixed list below.
+  const over25Log=log.filter(e=>(e.picks||[]).some(p=>getMarketType(p.pick)==="Over 2.5"));
+  if(over25Log.length>0){
+    // Flat-stake profit tracker — every Over 2.5 pick treated as its own single
+    // bet (not combined into an accumulator) at a fixed stake, so it's a direct
+    // "are these actually profitable" readout rather than just a hit rate.
+    const STAKE=1000;
+    const o25Picks=over25Log.map(e=>e.picks.find(p=>getMarketType(p.pick)==="Over 2.5"));
+    const o25Resolved=o25Picks.filter(p=>p.result==="win"||p.result==="loss");
+    const o25Wins=o25Resolved.filter(p=>p.result==="win");
+    const o25Pending=o25Picks.length-o25Resolved.length;
+    const o25Staked=o25Resolved.length*STAKE;
+    const o25Returned=o25Wins.reduce((s,p)=>s+STAKE*(parseFloat(p.odds)||0),0);
+    const o25Net=o25Returned-o25Staked;
+    const o25Roi=o25Staked>0?(o25Net/o25Staked*100):0;
+    const netColor=o25Net>0?"#16a34a":o25Net<0?"#dc2626":"var(--muted)";
+    const fmt=n=>Math.round(n).toLocaleString();
+    statsHTML+="<div style=\"background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;margin-bottom:14px;overflow:hidden\">"+
+      "<div onclick=\"toggleOver25Box()\" style=\"padding:11px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer\">"+
+      "<div style=\"font-size:12.5px;font-weight:700;color:var(--muted)\">&#x26BD; Over 2.5 Confirmed ("+over25Log.length+")</div>"+
+      "<div style=\"font-size:11px;color:var(--dim)\">"+(over25BoxOpen?"&#x25B4;":"&#x25BE;")+"</div></div>"+
+      (o25Resolved.length>0?(
+        "<div style=\"padding:0 14px 12px\"><div style=\"background:var(--s1);border:1px solid var(--bd);border-radius:10px;padding:12px 14px\">"+
+        "<div style=\"font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin-bottom:8px\">Profit Tracker &middot; "+fmt(STAKE)+" flat stake, single bets</div>"+
+        "<div style=\"display:grid;grid-template-columns:repeat(2,1fr);gap:8px 14px;font-size:12.5px\">"+
+        "<div><span style=\"color:var(--dim)\">Picks resolved</span><br><span style=\"font-weight:700;color:var(--ink)\">"+o25Resolved.length+"</span><span style=\"color:var(--dim)\"> ("+o25Wins.length+"W-"+(o25Resolved.length-o25Wins.length)+"L)"+(o25Pending>0?", "+o25Pending+" pending":"")+"</span></div>"+
+        "<div><span style=\"color:var(--dim)\">Staked</span><br><span style=\"font-weight:700;color:var(--ink)\">"+fmt(o25Staked)+"</span></div>"+
+        "<div><span style=\"color:var(--dim)\">Returned</span><br><span style=\"font-weight:700;color:var(--ink)\">"+fmt(o25Returned)+"</span></div>"+
+        "<div><span style=\"color:var(--dim)\">Net P/L</span><br><span style=\"font-weight:800;color:"+netColor+"\">"+(o25Net>0?"+":"")+fmt(o25Net)+" ("+(o25Roi>0?"+":"")+o25Roi.toFixed(1)+"% ROI)</span></div>"+
+        "</div></div></div>"
+      ):"");
+    if(over25BoxOpen){
+      statsHTML+="<div style=\"padding:0 14px 10px\">"+over25Log.map(entry=>{
+        const homeT=entry.homeTeam||(entry.match?entry.match.split(" vs ")[0]:"")||"";
+        const awayT=entry.awayTeam||(entry.match?entry.match.split(" vs ")[1]:"")||"";
+        const o25=entry.picks.find(p=>getMarketType(p.pick)==="Over 2.5");
+        const resColor=o25.result==="win"?"#16a34a":o25.result==="loss"?"#dc2626":"#9090a8";
+        const resTag=o25.result==="pending"?"<span style=\"color:var(--dim)\">&#x23F3;</span>":"<span style=\"color:"+resColor+";font-weight:700\">"+o25.result.toUpperCase()+"</span>";
+        return "<div style=\"display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 0;border-top:1px solid var(--s3)\">"+
+          "<div style=\"min-width:0\"><div style=\"font-size:12.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap\">"+homeT+" <span style=\"color:var(--dim);font-weight:500\">vs</span> "+awayT+"</div>"+
+          "<div style=\"font-size:11px;color:var(--dim);margin-top:1px;font-family:Courier New,monospace\">@ "+o25.odds+" &middot; "+o25.score+"/10 &middot; "+resTag+"</div></div>"+
+          "<button class=\"del-btn\" onclick=\"delEntry("+entry.id+")\" >&#x1F5D1;</button></div>";
+      }).join("")+"</div>";
+    }
+    statsHTML+="</div>";
+  }
+  let html="";
+  if(log.length===0){html+="<div class=\"empty-log\"><div style=\"font-size:36px;margin-bottom:12px;opacity:.4\">&#x1F4CB;</div><div>No matches logged yet.</div><div style=\"margin-top:6px;font-size:13px;color:var(--dim)\">Every analysis saves here automatically.</div></div>";}
+  else{
+    html+=log.map(entry=>{
+      const picks=(entry.picks||[]);
+      const homeT=entry.homeTeam||(entry.match?entry.match.split(" vs ")[0]:"")||"";
+      const awayT=entry.awayTeam||(entry.match?entry.match.split(" vs ")[1]:"")||"";
+      const goalsTagText=(entry.expectedGoals5!=null&&entry.expectedGoals15!=null)
+        ? "L5: "+entry.expectedGoals5+" &middot; L15: "+entry.expectedGoals15+" xG"
+        : entry.expectedGoals!=null?entry.expectedGoals+" xG":null;
+      const goalsTag=goalsTagText?"<span style=\"font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(217,119,6,0.1);color:var(--amber);border:1px solid rgba(217,119,6,0.25);margin-left:6px\">&#x26BD; "+goalsTagText+"</span>":"";
+      // GOALS LOCK — same rule as the Analyse tab: Over 1.5 (score>=9) AND Over 2.5
+      // (score>=8) both present in the SAME match. Tags only those two picks, not
+      // the whole entry — independent from, and can coexist with, Best Bet.
+      const o15pick=picks.find(p=>getMarketType(p.pick)==="Over 1.5");
+      const o25pick=picks.find(p=>getMarketType(p.pick)==="Over 2.5");
+      const hasGoalsLock=!!(o15pick&&o25pick&&(parseFloat(o15pick.score)||0)>=9&&(parseFloat(o25pick.score)||0)>=8);
+      // SURE LOCK — 1X2 + Over 1.5 + Over 2.5 all present AND each a genuine 10/10.
+      const oneXtwoPick=picks.find(p=>{const t=(p.pick||"").toLowerCase();return t.includes("1x2")&&(t.includes("home win")||t.includes("away win"));});
+      const hasSureLock=!!(oneXtwoPick&&o15pick&&o25pick&&(parseFloat(oneXtwoPick.score)||0)>=9.95&&(parseFloat(o15pick.score)||0)>=9.95&&(parseFloat(o25pick.score)||0)>=9.95);
+      // VERIFIED LOCK — NOT limited to the Sure Lock trio: ANY pick in this match
+      // qualifies on its own if it hit the engine's genuine ceiling (9.95+/10)
+      // AND that exact market type has a logged track record (not just today's
+      // score). A lone BTTS or Home Goals pick earns this the same as the
+      // 1X2/Over trio can. Entries logged before this feature won't carry
+      // trackRate/trackN and simply won't qualify — that's expected, not a bug.
+      const VERIFIED_RATE_MIN=85,VERIFIED_N_MIN=10;
+      const isVerifiedPick=p=>(parseFloat(p.score)||0)>=9.95&&p.trackRate!=null&&p.trackN!=null&&p.trackRate>=VERIFIED_RATE_MIN&&p.trackN>=VERIFIED_N_MIN;
+      return "<div class=\"log-entry\">"+
+        "<div class=\"log-head\"><div><div style=\"font-size:11px;color:#9090a8;margin-bottom:2px\">"+entry.date+" "+modeTagHTML()+goalsTag+"</div>"+
+        "<div style=\"font-size:13px;font-weight:700;color:var(--ink);margin-bottom:2px\"><span>"+homeT+"</span><span style=\"color:var(--dim);font-weight:500\"> vs </span><span>"+awayT+"</span></div>"+
+        "<div style=\"font-size:12px;font-weight:600;color:var(--muted)\">"+picks.length+" pick"+(picks.length!==1?"s":"")+"</div></div><div style=\"display:flex;align-items:center;gap:2px\"><button class=\"del-btn\" style=\""+(entry.favorite?"color:#d4a017":"")+"\" onclick=\"toggleFavorite("+entry.id+")\" >"+(entry.favorite?"&#x2605;":"&#x2606;")+"</button><button class=\"del-btn\" onclick=\"delEntry("+entry.id+")\" >&#x1F5D1;</button></div></div>"+
+        "<div class=\"log-picks\">"+picks.map((p,pi)=>{
+          const mt=getMarketType(p.pick);
+          const isTeamGoals=mt==="Home Goals"||mt==="Away Goals";
+          const parts=(p.pick||"").split("—");
+          const teamName=isTeamGoals&&parts.length>1?parts[0].trim():null;
+          const selection=parts.length>1?parts[parts.length-1].trim().replace(/^(Home|Away) Team /,""):p.pick;
+          const teamTag=teamName?"<span style=\"font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(217,119,6,0.12);color:var(--amber);border:1px solid rgba(217,119,6,0.3)\">&#x2605; "+teamName+"</span>":"";
+          const resColor=p.result==="win"?"#16a34a":p.result==="loss"?"#dc2626":"#9090a8";
+          const isGoalsLockPick=hasGoalsLock&&(p===o15pick||p===o25pick);
+          const goalsLockTag=isGoalsLockPick?"<span style=\"font-size:10px;font-weight:800;letter-spacing:0.05em;padding:2px 8px;border-radius:999px;background:rgba(22,163,74,0.12);color:#16a34a;border:1px solid rgba(22,163,74,0.35)\">&#x1F512; GOALS LOCK</span>":"";
+          const edgeNum=Math.abs(parseFloat(String(p.edge||"").replace(/[^0-9.-]/g,""))||0);
+          const isBestBet=(parseFloat(p.score)||0)>=9&&edgeNum>=15;
+          // SURE LOCK — the rarest confirmation: 1X2 + Over 1.5 + Over 2.5 all
+          // present AND each a genuine 10/10. Takes visual priority over both
+          // Best Bet and Goals Lock on the specific picks that make it up.
+          const isSureLockPick=hasSureLock&&(p===oneXtwoPick||p===o15pick||p===o25pick);
+          const isVerifiedLockPick=isVerifiedPick(p);
+          const verifiedLockTag=isVerifiedLockPick?"<span style=\"font-size:10px;font-weight:800;letter-spacing:0.05em;padding:2px 8px;border-radius:999px;background:linear-gradient(135deg,#2dd4bf,#0d9488);color:#fff\">&#x2705; VERIFIED LOCK</span>":"";
+          const sureLockTag=(!isVerifiedLockPick&&isSureLockPick)?"<span style=\"font-size:10px;font-weight:800;letter-spacing:0.05em;padding:2px 8px;border-radius:999px;background:linear-gradient(135deg,#a78bfa,#7c3aed);color:#fff\">&#x1F48E; SURE LOCK</span>":"";
+          const bestBetTag=(!isSureLockPick&&isBestBet)?"<span style=\"font-size:10px;font-weight:800;letter-spacing:0.05em;padding:2px 8px;border-radius:999px;background:linear-gradient(135deg,#f5d76e,#d4a017);color:#3a2a00\">&#x2B50; BEST BET</span>":"";
+          // Verified Lock (teal) > Sure Lock (purple) > Best Bet (gold) > Goals
+          // Lock (green) for border priority when a pick qualifies for more than one.
+          const rowBorder=isVerifiedLockPick?"border-left:3px solid #0d9488;background:rgba(13,148,136,0.07);":isSureLockPick?"border-left:3px solid #7c3aed;background:rgba(124,58,237,0.06);":isBestBet?"border-left:3px solid #d4a017;background:rgba(212,160,23,0.05);":isGoalsLockPick?"border-left:3px solid #16a34a;background:rgba(22,163,74,0.05);":"";
+          return "<div class=\"log-pick-row\" style=\""+rowBorder+"\">"+
+            "<div style=\"flex:1;min-width:0\">"+
+            "<div style=\"display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap\">"+
+            "<span style=\"font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;padding:2px 7px;border-radius:999px;background:rgba(37,99,235,0.1);color:#2563eb;border:1px solid rgba(37,99,235,0.2)\">"+mt+"</span>"+
+            teamTag+verifiedLockTag+sureLockTag+bestBetTag+goalsLockTag+
+            "<span style=\"font-family:Courier New,monospace;font-size:12px;font-weight:700;color:var(--silver)\">"+p.odds+"</span>"+
+            "<span style=\"font-family:Courier New,monospace;font-size:11px;color:var(--muted)\">"+p.score+"/10</span>"+
+            "</div>"+
+            "<div style=\"font-size:12px;color:var(--muted);margin-top:1px\">"+selection+"</div>"+
+            "</div>"+
+            "<div style=\"display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0\">"+
+            "<div class=\"res-btns\"><button class=\"res-btn "+(p.result==="win"?"win":"")+"\" onclick=\"setRes("+entry.id+","+pi+",'win')\">&#x2713; W</button><button class=\"res-btn "+(p.result==="loss"?"loss":"")+"\" onclick=\"setRes("+entry.id+","+pi+",'loss')\">&#x2715; L</button></div>"+
+            (p.result==="pending"?"<div class=\"pending-tag\">&#x23F3;</div>":"<div style=\"font-size:11px;font-weight:700;color:"+resColor+"\">"+p.result.toUpperCase()+"</div>")+
+            "</div></div>";
+        }).join("")+
+        "</div></div>";
+    }).join("");}
+  document.getElementById("logContent").innerHTML=statsHTML+html;
+}
+
+function setRes(id,pi,res){const log=loadLog();saveLog(log.map(e=>e.id!==id?e:{...e,picks:e.picks.map((p,i)=>i!==pi?p:{...p,result:p.result===res?"pending":res})}));renderLog();}
+function delEntry(id){saveLog(loadLog().filter(e=>e.id!==id));renderLog();}
+function toggleFavorite(id){
+  const log=loadLog();
+  const e=log.find(e=>e.id===id);
+  if(e)e.favorite=!e.favorite;
+  saveLog(log);
+  renderLog();
+}
+
+// ── UI ──
+function switchTab(tab){
+  document.getElementById("analyseTab").style.display=tab==="analyse"?"block":"none";
+  document.getElementById("logTab").style.display=tab==="log"?"block":"none";
+  document.getElementById("tabAnalyse").className="tab"+(tab==="analyse"?" active":"");
+  document.getElementById("tabLog").className="tab"+(tab==="log"?" active":"");
+  if(tab==="log")renderLog();
+}
+function resetApp(){
+  document.getElementById("oddsInput").value="";
+  document.getElementById("formInput").value="";
+  if(document.getElementById("form15Input"))document.getElementById("form15Input").value="";
+  if(document.getElementById("oddsInput2"))document.getElementById("oddsInput2").value="";
+  if(document.getElementById("oddsInput3"))document.getElementById("oddsInput3").value="";
+  document.getElementById("resultSection").style.display="none";
+  document.getElementById("resultSection").innerHTML="";
+  document.getElementById("inputSection").style.display="block";
+  document.getElementById("runBtn").disabled=false;
+  document.getElementById("resetBtn").style.display="none";
+  hideError();
+}
+function showError(msg){const b=document.getElementById("errorBox");b.textContent=msg;b.style.display="block";}
+function hideError(){document.getElementById("errorBox").style.display="none";}
+
+// ── INSTALL ──
+let dp=null;
+async function triggerInstall(){if(dp){dp.prompt();const{outcome}=await dp.userChoice;if(outcome==="accepted")document.getElementById("installHdrBtn").style.display="none";dp=null;}else{alert("To install: tap browser menu → Add to Home Screen");}}
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();dp=e;});
+</script>
+</body>
+</html>
