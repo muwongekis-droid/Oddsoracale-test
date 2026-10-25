@@ -150,8 +150,8 @@ textarea:focus{outline:none;border-color:var(--silver3);}
     </div>
     <div>
       <div class="box-label">Last 5 + Last 15 Stats <span class="opt-tag">optional</span></div>
-      <div class="box-sub">mutating.com &mdash; paste Last 5 first, leave one blank line, then paste Last 15 straight after. Applies to Match 1 only.</div>
-      <button class="run-btn" id="fetchBtn" type="button" onclick="fetchMutating()" style="margin-bottom:8px;background:#2a2f3a">&#x1F4E1; Fetch stats from mutating (auto)</button>
+      <div class="box-sub">mutating.com &mdash; paste Last 5 first, leave one blank line, then paste Last 15 straight after. Auto-fetch fills all matches in the box.</div>
+      <button class="run-btn" id="fetchBtn" type="button" onclick="__lastFetchKey='';fetchMutating(false)" style="margin-bottom:8px;background:#2a2f3a">&#x1F4E1; Fetch stats from mutating (auto)</button>
       <div id="fetchStatus" class="box-sub" style="margin-bottom:8px"></div>
       <textarea id="formInput" style="min-height:170px" placeholder="Paste Last 5 stats here...&#10;&#10;(leave a blank line)&#10;&#10;...then paste Last 15 stats here."></textarea>
     </div>
@@ -180,6 +180,7 @@ textarea:focus{outline:none;border-color:var(--silver3);}
       <div id="importMsg" style="font-size:12px;margin-top:8px"></div>
     </div>
   </div>
+  <div style="margin:0 0 10px"><button class="btn-sm" id="resBtn" style="width:100%;padding:11px" onclick="checkResults()">&#x1F4CA; Check results (auto-mark finished matches)</button><div id="resMsg" style="font-size:12px;margin-top:6px;color:var(--dim)"></div></div>
   <div id="logContent"></div>
 </div>
 <script>
@@ -937,22 +938,119 @@ function splitFormInput(raw){
   return{l5:parts[0],l15:parts.slice(1).join("\n\n")};
 }
 
-async function fetchMutating(){
+let __lastFetchKey="", __fetching=false, __formByMatch={};
+const __fk=(h,a)=>(h||"").toLowerCase().trim()+"|"+(a||"").toLowerCase().trim();
+function __teamsOf(raw){
+  return splitMultiMatchOdds(raw,5).map(function(blk){const b=parseOddsBoard(blk);return{home:b.homeTeam,away:b.awayTeam};}).filter(function(t){return t.home&&t.away;});
+}
+async function __fetchOne(h,a,st,label){
+  let lastErr="";
+  for(let t=1;t<=3;t++){
+    st.textContent=label+" "+h+" v "+a+" (try "+t+" of 3)...";
+    try{
+      const r=await fetch("/.netlify/functions/mutating?home="+encodeURIComponent(h)+"&away="+encodeURIComponent(a));
+      const x=await r.json();
+      if(x.ok)return{ok:true,j:x};
+      lastErr=x.reason||"unknown"; console.log(x);
+      if(x.reason==="match_not_found"||x.reason==="ambiguous"||x.reason==="missing_names")break;
+    }catch(e){lastErr=e.message;}
+    await new Promise(function(res){setTimeout(res,1200);});
+  }
+  return{ok:false,err:lastErr};
+}
+async function fetchMutating(auto){
   const st=document.getElementById("fetchStatus"), fb=document.getElementById("fetchBtn");
+  if(__fetching)return;
   try{
     const raw=document.getElementById("oddsInput").value;
     if(!raw.trim()){st.textContent="Paste the odds board first.";return;}
-    const b=parseOddsBoard(splitMultiMatchOdds(raw,5)[0]);
-    const h=b.homeTeam||b.home, a=b.awayTeam||b.away;
-    if(!h||!a){st.textContent="Couldn't read team names from the odds board.";return;}
-    fb.disabled=true; st.textContent="Fetching "+h+" v "+a+" ...";
-    const r=await fetch("/.netlify/functions/mutating?home="+encodeURIComponent(h)+"&away="+encodeURIComponent(a));
-    const j=await r.json();
-    if(!j.ok){st.textContent="Not fetched: "+j.reason+". Paste manually.";console.log(j);return;}
-    document.getElementById("formInput").value=j.text5+"\n\n"+j.text15;
-    st.textContent="Filled for "+j.home+" v "+j.away+(j.approx?" (APPROXIMATE: "+(j.notes||[]).join(" ")+")":" (Last 5 + Last 15, exact)")+". Applies to match 1 only.";
+    const teams=__teamsOf(raw);
+    if(!teams.length){st.textContent="Couldn't read team names from the odds board.";return;}
+    __fetching=true; fb.disabled=true; __formByMatch={};
+    let okN=0, approxN=0, fails=[];
+    for(let i=0;i<teams.length;i++){
+      const t=teams[i];
+      const res=await __fetchOne(t.home,t.away,st,"Match "+(i+1)+" of "+teams.length+": fetching");
+      if(!res.ok){fails.push(t.home+" v "+t.away+" ("+res.err+")");continue;}
+      const j=res.j;
+      if(j.approx)approxN++;
+      __formByMatch[__fk(t.home,t.away)]={l5:j.text5,l15:j.text15};
+      if(i===0)document.getElementById("formInput").value=j.text5+"\n\n"+j.text15;
+      okN++;
+    }
+    __lastFetchKey=teams.map(function(t){return __fk(t.home,t.away);}).join("#");
+    let msg="Stats loaded for "+okN+" of "+teams.length+" match(es)"+(approxN?" ("+approxN+" approximate)":", exact")+".";
+    if(fails.length)msg+=" Not fetched: "+fails.join("; ")+" (these run on odds only).";
+    st.textContent=msg;
+    if(auto && okN>0 && !approxN && !fails.length){ __fetching=false; runAnalysis(); }
   }catch(e){st.textContent="Fetch failed: "+e.message;}
-  finally{fb.disabled=false;}
+  finally{__fetching=false;fb.disabled=false;}
+}
+(function(){
+  let timer=null;
+  function schedule(){
+    clearTimeout(timer);
+    timer=setTimeout(function(){
+      try{
+        const v=document.getElementById("oddsInput").value;
+        if(v.length<400||v.indexOf("Football//")<0)return;
+        const teams=__teamsOf(v);
+        if(!teams.length)return;
+        const key=teams.map(function(t){return __fk(t.home,t.away);}).join("#");
+        if(key===__lastFetchKey)return;
+        fetchMutating(true);
+      }catch(e){}
+    },2500);
+  }
+  window.addEventListener("load",function(){
+    const el=document.getElementById("oddsInput");
+    el.addEventListener("input",schedule); el.addEventListener("paste",schedule);
+  });
+})();
+
+// ── AUTO RESULTS (test copy) ──
+function gradePick(pick,hs,as){
+  const t=String(pick||"").trim(), tot=hs+as; let m;
+  if((m=t.match(/^Over ([0-9.]+)\s*\+\s*Over ([0-9.]+)\s*\+\s*BTTS$/i)))return (tot>+m[1]&&tot>+m[2]&&hs>0&&as>0)?"win":"loss";
+  if((m=t.match(/^Over ([0-9.]+)\s*\+\s*Over ([0-9.]+)$/i)))return (tot>+m[1]&&tot>+m[2])?"win":"loss";
+  if((m=t.match(/^Over ([0-9.]+)$/i)))return tot>+m[1]?"win":"loss";
+  if((m=t.match(/^Under ([0-9.]+)$/i)))return tot<+m[1]?"win":"loss";
+  if(/^BTTS Yes$/i.test(t))return (hs>0&&as>0)?"win":"loss";
+  if(/^BTTS No$/i.test(t))return (hs===0||as===0)?"win":"loss";
+  if(/^Home Win \(1X2\)/i.test(t))return hs>as?"win":"loss";
+  if(/^Away Win \(1X2\)/i.test(t))return as>hs?"win":"loss";
+  if(/^Draw \(1X2\)/i.test(t))return hs===as?"win":"loss";
+  if(/^DNB Home/i.test(t)){if(hs===as)return null;return hs>as?"win":"loss";}
+  if(/^DNB Away/i.test(t)){if(hs===as)return null;return as>hs?"win":"loss";}
+  if((m=t.match(/^(Home|Away) Team Over ([0-9.]+)/i))){const g=/^home/i.test(m[1])?hs:as;return g>+m[2]?"win":"loss";}
+  return null; // anything not clearly gradable stays pending
+}
+async function checkResults(){
+  const msg=document.getElementById("resMsg"); const btn=document.getElementById("resBtn");
+  btn.disabled=true; msg.textContent="Checking results...";
+  let log=loadLog(), graded=0, notDone=0, notFound=0, skipped=0, seen={};
+  try{
+    for(const e of log){
+      if(!e.homeTeam||!e.awayTeam||!e.picks||!e.picks.some(p=>p.result==="pending"))continue;
+      const key=e.homeTeam+"|"+e.awayTeam;
+      if(!(key in seen)){
+        try{const r=await fetch("/.netlify/functions/results?home="+encodeURIComponent(e.homeTeam)+"&away="+encodeURIComponent(e.awayTeam));seen[key]=await r.json();}
+        catch(x){seen[key]={ok:false,reason:"net"};}
+      }
+      const R=seen[key];
+      if(!R.ok){notFound++;continue;}
+      if(!R.finished){notDone++;continue;}
+      e.picks=e.picks.map(p=>{
+        if(p.result!=="pending")return p;
+        const g=gradePick(p.pick,R.hs,R.as);
+        if(!g){skipped++;return p;}
+        graded++; return {...p,result:g,auto:true,finalScore:R.hs+"-"+R.as};
+      });
+    }
+    saveLog(log); renderLog();
+    msg.textContent="Graded "+graded+" pick(s). Not finished yet: "+notDone+" match(es). Not found on mutating: "+notFound+". Left for you to mark: "+skipped+".";
+  }catch(x){msg.textContent="Check failed: "+x.message;}
+  finally{btn.disabled=false;}
 }
 function runAnalysis(){
   const rawOdds=document.getElementById("oddsInput").value;
@@ -972,7 +1070,12 @@ function runAnalysis(){
   const blocks=splitMultiMatchOdds(rawOdds,5);
   // Only the FIRST detected match carries the Last 5/Last 15 form boxes (if filled);
   // every match after that in the same paste runs odds-only.
-  const outcomes=blocks.map((b,i)=>analyzeOne(b,i===0?formText:"",i===0?form15Text:"",cal));
+  const outcomes=blocks.map((b,i)=>{
+    if(i===0)return analyzeOne(b,formText,form15Text,cal);
+    let f5="",f15="";
+    try{const bb=parseOddsBoard(b);const fm=__formByMatch[__fk(bb.homeTeam,bb.awayTeam)];if(fm){const sp=splitFormInput(fm.l5+"\n\n"+fm.l15);f5=sp.l5;f15=sp.l15;}}catch(e){}
+    return analyzeOne(b,f5,f15,cal);
+  });
   clearInterval(iv);thinking.style.display="none";
   let log=loadLog();
   for(const{result}of outcomes){
@@ -991,6 +1094,47 @@ function runAnalysis(){
   renderResult(outcomes);
 }
 
+
+// ── CORRECT SCORE (display only; never feeds the pick engine) ──
+function _pois(l,k){let p=Math.exp(-l);for(let i=1;i<=k;i++)p*=l/i;return p;}
+function correctScore(result,odds){
+  try{
+    if(!odds)return null;
+    const hw=+odds.home_win,aw=+odds.away_win,dr=+odds.draw;
+    if(!(hw>1&&aw>1))return null;
+    const dv=(dr>1)?(1/hw+1/dr+1/aw):(1/hw+1/aw);
+    const ph=(1/hw)/dv,pa=(1/aw)/dv;
+    let T=(result&&result.expectedGoals!=null)?+result.expectedGoals:null,Tm=null;
+    const o25=+odds.over_25,u25=+odds.under_25;
+    if(o25>1&&u25>1){
+      const po=(1/o25)/(1/o25+1/u25);let bd=9;
+      for(let t=0.8;t<=5.5;t+=0.02){const pu=_pois(t,0)+_pois(t,1)+_pois(t,2);const d=Math.abs((1-pu)-po);if(d<bd){bd=d;Tm=t;}}
+    }
+    if(T==null&&Tm==null&&+odds.bpw_goals_avg>0)T=+odds.bpw_goals_avg;
+    const tot=(T!=null&&Tm!=null)?(T+Tm)/2:(T!=null?T:Tm);
+    if(!tot||tot<=0)return null;
+    const N=10;
+    const diffAt=function(s){let a=0,b=0;const lh=tot*s,la=tot*(1-s);
+      for(let i=0;i<=N;i++)for(let j=0;j<=N;j++){const q=_pois(lh,i)*_pois(la,j);if(i>j)a+=q;else if(j>i)b+=q;}
+      return a-b;};
+    let bs=0.5,bd2=9;
+    for(let s=0.15;s<=0.85;s+=0.01){const d=Math.abs(diffAt(s)-(ph-pa));if(d<bd2){bd2=d;bs=s;}}
+    const lh=tot*bs,la=tot*(1-bs),rho=-0.08;
+    const tau=function(i,j){if(i===0&&j===0)return 1-lh*la*rho;if(i===0&&j===1)return 1+lh*rho;if(i===1&&j===0)return 1+la*rho;if(i===1&&j===1)return 1-rho;return 1;};
+    const cells=[];let sum=0;
+    for(let i=0;i<=7;i++)for(let j=0;j<=7;j++){const q=_pois(lh,i)*_pois(la,j)*tau(i,j);cells.push({i:i,j:j,q:q});sum+=q;}
+    cells.sort(function(a,b){return b.q-a.q;});
+    return{top:cells.slice(0,3).map(function(c){return{score:c.i+"-"+c.j,pct:Math.round(100*c.q/sum)};}),lh:lh,la:la};
+  }catch(e){return null;}
+}
+function correctScoreHTML(result,odds){
+  const c=correctScore(result,odds);
+  if(!c)return "";
+  return "<div style='margin:-6px 0 12px;padding:10px 14px;border:1px solid var(--bd);border-radius:12px;background:var(--card,#fff);display:flex;align-items:center;gap:12px;flex-wrap:wrap'>"+
+    "<span style='font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--dim)'>&#x1F3AF; LIKELY SCORE</span>"+
+    "<span style='font-size:22px;font-weight:800'>"+c.top[0].score+"</span><span style='font-size:12px;color:var(--dim)'>"+c.top[0].pct+"%</span>"+
+    "<span style='font-size:12.5px;color:var(--dim)'>then "+c.top[1].score+" ("+c.top[1].pct+"%) &middot; "+c.top[2].score+" ("+c.top[2].pct+"%)</span></div>";
+}
 function buildMatchHTML(result,odds,form){
   const noPick=!result.picks||result.picks.length===0||result.no_pick_reason;
   // Show both windows' goal averages when both were pasted, rather than quietly
@@ -999,7 +1143,7 @@ function buildMatchHTML(result,odds,form){
   const xgTag=(result.expectedGoals5!=null&&result.expectedGoals15!=null)
     ? " &middot; L5: ~"+result.expectedGoals5+" xG &middot; L15: ~"+result.expectedGoals15+" xG"
     : result.expectedGoals!=null?" &middot; ~"+result.expectedGoals+" xG":"";
-  let html="<div class='result-banner'><div class='result-eye'>&#x26A1; Oracle &mdash; "+(noPick?"no qualifying picks":(result.picks.length+" pick"+(result.picks.length!==1?"s":"")+" found"))+"</div><div class='result-match'>"+result.match+"</div><div class='result-mode'>&#x26A1; Rules Engine &mdash; "+(result._mkt||0)+" markets scanned"+xgTag+"</div></div>";
+  let html="<div class='result-banner'><div class='result-eye'>&#x26A1; Oracle &mdash; "+(noPick?"no qualifying picks":(result.picks.length+" pick"+(result.picks.length!==1?"s":"")+" found"))+"</div><div class='result-match'>"+result.match+"</div><div class='result-mode'>&#x26A1; Rules Engine &mdash; "+(result._mkt||0)+" markets scanned"+xgTag+"</div></div>"+correctScoreHTML(result,odds);
   const goalsLock=!noPick&&(()=>{
     const o15=result.picks.find(p=>(p.market||p.pick||"").toLowerCase().includes("over 1.5"));
     const o25=result.picks.find(p=>(p.market||p.pick||"").toLowerCase().includes("over 2.5"));
