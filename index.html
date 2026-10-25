@@ -144,14 +144,14 @@ textarea:focus{outline:none;border-color:var(--silver3);}
 <div id="analyseTab" class="zone">
   <div id="inputSection">
     <div>
-      <div class="box-label">Odds Board <span class="opt-tag">up to 5 matches</span></div>
-      <div class="box-sub">Paste up to 5 full odds boards back-to-back, one after another — no separator needed, each match's team names + "Football//" marker is detected automatically.</div>
-      <textarea id="oddsInput" style="min-height:170px" placeholder="Paste match 1's full odds board, then straight after it paste match 2's, then match 3's... up to 5 matches in this one box."></textarea>
+      <div class="box-label">Odds Board <span class="opt-tag">up to 10 matches</span></div>
+      <div class="box-sub">Paste up to 10 full odds boards back-to-back, one after another — no separator needed, each match's team names + "Football//" marker is detected automatically.</div>
+      <textarea id="oddsInput" style="min-height:170px" placeholder="Paste match 1's full odds board, then straight after it paste match 2's, then match 3's... up to 10 matches in this one box."></textarea>
     </div>
     <div>
       <div class="box-label">Last 5 + Last 15 Stats <span class="opt-tag">optional</span></div>
       <div class="box-sub">mutating.com &mdash; paste Last 5 first, leave one blank line, then paste Last 15 straight after. Auto-fetch fills all matches in the box.</div>
-      <button class="run-btn" id="fetchBtn" type="button" onclick="__lastFetchKey='';fetchMutating(false)" style="margin-bottom:8px;background:#2a2f3a">&#x1F4E1; Fetch stats from mutating (auto)</button>
+      <button class="run-btn" id="fetchBtn" type="button" onclick="fetchMutating(true)" style="margin-bottom:8px;background:#2a2f3a">&#x1F4E1; Fetch stats for all matches + find picks</button>
       <div id="fetchStatus" class="box-sub" style="margin-bottom:8px"></div>
       <textarea id="formInput" style="min-height:170px" placeholder="Paste Last 5 stats here...&#10;&#10;(leave a blank line)&#10;&#10;...then paste Last 15 stats here."></textarea>
     </div>
@@ -941,7 +941,7 @@ function splitFormInput(raw){
 let __lastFetchKey="", __fetching=false, __formByMatch={};
 const __fk=(h,a)=>(h||"").toLowerCase().trim()+"|"+(a||"").toLowerCase().trim();
 function __teamsOf(raw){
-  return splitMultiMatchOdds(raw,5).map(function(blk){const b=parseOddsBoard(blk);return{home:b.homeTeam,away:b.awayTeam};}).filter(function(t){return t.home&&t.away;});
+  return splitMultiMatchOdds(raw,10).map(function(blk){const b=parseOddsBoard(blk);return{home:b.homeTeam,away:b.awayTeam};}).filter(function(t){return t.home&&t.away;});
 }
 async function __fetchOne(h,a,st,label){
   let lastErr="";
@@ -986,28 +986,6 @@ async function fetchMutating(auto){
   }catch(e){st.textContent="Fetch failed: "+e.message;}
   finally{__fetching=false;fb.disabled=false;}
 }
-(function(){
-  let timer=null;
-  function schedule(){
-    clearTimeout(timer);
-    timer=setTimeout(function(){
-      try{
-        const v=document.getElementById("oddsInput").value;
-        if(v.length<400||v.indexOf("Football//")<0)return;
-        const teams=__teamsOf(v);
-        if(!teams.length)return;
-        const key=teams.map(function(t){return __fk(t.home,t.away);}).join("#");
-        if(key===__lastFetchKey)return;
-        fetchMutating(true);
-      }catch(e){}
-    },2500);
-  }
-  window.addEventListener("load",function(){
-    const el=document.getElementById("oddsInput");
-    el.addEventListener("input",schedule); el.addEventListener("paste",schedule);
-  });
-})();
-
 // ── AUTO RESULTS (test copy) ──
 function gradePick(pick,hs,as){
   const t=String(pick||"").trim(), tot=hs+as; let m;
@@ -1067,7 +1045,7 @@ function runAnalysis(){
   let si=0;thinkingText.textContent=STEPS[0];
   const iv=setInterval(()=>{si=Math.min(si+1,STEPS.length-1);thinkingText.textContent=STEPS[si];},700);
   const cal=calibrate(loadLog()).byMarket;
-  const blocks=splitMultiMatchOdds(rawOdds,5);
+  const blocks=splitMultiMatchOdds(rawOdds,10);
   // Only the FIRST detected match carries the Last 5/Last 15 form boxes (if filled);
   // every match after that in the same paste runs odds-only.
   const outcomes=blocks.map((b,i)=>{
