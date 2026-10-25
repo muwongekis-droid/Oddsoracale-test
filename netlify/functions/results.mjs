@@ -9,7 +9,7 @@ async function fetchT(url, opts = {}, ms = 8000) {
 }
 const STOP = new Set(["fc","cf","sc","ac","as","afc","sk","fk","kv","ud","cd","sd","rc","ss","us","the","de","la","el","club","calcio","cp","fsv","tsv","vfb","vfl","sv","bk","if","ik"]);
 const ALIAS = { wolves: "wolverhampton", spurs: "tottenham", utd: "united", man: "manchester", psg: "paris", gladbach: "monchengladbach" };
-const tokens = (n) => String(n || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" ").map((t) => ALIAS[t] || t).filter((t) => t.length > 1 && !STOP.has(t) && !/^\d{4}$/.test(t));
+const tokens = (n) => String(n || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" ").map((t) => ALIAS[t] || t).filter((t) => t.length > 1 && !STOP.has(t) && !/^\d{4}$/.test(t));
 const tokMatch = (a, b) => a === b || (a.length >= 3 && b.length >= 3 && (a.startsWith(b) || b.startsWith(a)));
 function nameScore(a, b) {
   const A = tokens(a), B = tokens(b); if (!A.length || !B.length) return 0;
