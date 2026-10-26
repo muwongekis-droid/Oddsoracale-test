@@ -1,5 +1,7 @@
-// OddsOracle TEST helper: final score of one match, from mutating.com day lists.
-// /.netlify/functions/results?home=Como&away=Sassuolo  (add &debug=1 for diagnostics)
+// OddsOracle TEST helper: final score of one match.
+// mutating.com fills the score box with a POST to /updategame-<code>/ (code = end of the match page address).
+// /.netlify/functions/results?url=<match page address>            (preferred: saved when stats were fetched)
+// /.netlify/functions/results?home=Como&away=Sassuolo            (fallback: looks the match up on the day lists)
 const BASE = "https://www.mutating.com";
 const UA = "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36";
 const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
@@ -7,52 +9,88 @@ async function fetchT(url, opts = {}, ms = 8000) {
   const c = new AbortController(); const t = setTimeout(() => c.abort(), ms);
   try { return await fetch(url, { ...opts, signal: c.signal }); } finally { clearTimeout(t); }
 }
-const STOP = new Set(["fc","cf","sc","ac","as","afc","sk","fk","kv","ud","cd","sd","rc","ss","us","the","de","la","el","club","calcio","cp","fsv","tsv","vfb","vfl","sv","bk","if","ik"]);
-const ALIAS = { wolves: "wolverhampton", spurs: "tottenham", utd: "united", man: "manchester", psg: "paris", gladbach: "monchengladbach" };
-const tokens = (n) => String(n || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" ").map((t) => ALIAS[t] || t).filter((t) => t.length > 1 && !STOP.has(t) && !/^\d{4}$/.test(t));
-const tokMatch = (a, b) => a === b || (a.length >= 3 && b.length >= 3 && (a.startsWith(b) || b.startsWith(a)));
-function nameScore(a, b) {
-  const A = tokens(a), B = tokens(b); if (!A.length || !B.length) return 0;
-  const inter = A.filter((x) => B.some((y) => tokMatch(x, y))).length;
-  const union = A.length + B.length - inter; return union ? inter / union : 0;
+const STOP = new Set([
+  "fc", "cf", "sc", "ac", "as", "afc", "sk", "fk", "kv", "ud", "cd", "sd", "rc", "ss", "us", "nk", "ue", "tc", "kf", "gd", "cs", "ca",
+  "the", "de", "la", "el", "club", "calcio", "cp", "fsv", "tsv", "vfb", "vfl", "sv", "bk", "if", "ik",
+]);
+const GENERIC = new Set(["city", "united", "town", "rovers", "athletic", "real", "sporting", "dynamo", "dinamo", "juniors", "academy", "county", "wanderers", "albion", "rangers", "olympic", "olympique", "sparta", "central", "north", "south", "east", "west", "saint", "santa", "deportivo", "deportes", "atletico", "racing", "inter", "internacional", "sport", "stadium", "utd"]);
+const ALIAS = { wolves: "wolverhampton", spurs: "tottenham", utd: "united", man: "manchester", psg: "paris", gladbach: "monchengladbach", st: "saint" };
+const MARK = /^(women|w|u\d{2}|ii|iii|b|res|reserves|youth)$/;
+function parts(name) {
+  const raw = String(name || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" ").filter(Boolean).map((t) => ALIAS[t] || t);
+  const marks = raw.filter((t) => MARK.test(t)).sort().join(",");
+  const core = raw.filter((t) => !MARK.test(t) && t.length > 1 && !STOP.has(t) && !/^\d{4}$/.test(t));
+  return { marks, core };
 }
-// every match-preview anchor on a day page, with a score if the row shows one
+const tokMatch = (a, b) => a === b || (a.length >= 3 && b.length >= 3 && (a.startsWith(b) || b.startsWith(a)));
+const wt = (t) => (GENERIC.has(t) ? 0.35 : 1);
+// 1 = same team, 0 = different. A short name that sits inside a longer one still scores high ("Rudes" in "NK Rudes Zagreb").
+function nameScore(a, b) {
+  const A = parts(a), B = parts(b);
+  if (!A.core.length || !B.core.length || A.marks !== B.marks) return 0;
+  const sum = (arr) => arr.reduce((s, t) => s + wt(t), 0);
+  const matched = A.core.filter((x) => B.core.some((y) => tokMatch(x, y))).reduce((s, t) => s + wt(t), 0);
+  if (!matched) return 0;
+  const ta = sum(A.core), tb = sum(B.core);
+  if (matched < 1 && (matched < ta - 0.001 || matched < tb - 0.001)) return 0; // only a generic word in common (Inter vs Inter Miami)
+  const overlap = matched / Math.min(ta, tb), jacc = matched / (ta + tb - matched);
+  return 0.8 * overlap + 0.2 * jacc;
+}
+
 function extractRows(html) {
-  const out = [];
-  for (const piece of html.split(/<a\s+[^>]*?href=/i).slice(1)) {
-    const hm = piece.match(/^["']([^"']*match-preview-(.+?)-stats-h2h-preview-and-prediction-[a-z0-9]+\/?)["']/i);
-    if (!hm) continue;
-    const parts = hm[2].split("-vs-"); if (parts.length !== 2) continue;
-    const body = piece.slice(0, 2500).split(/<\/a>/i)[0];
-    const sc = [...body.matchAll(/class=['"]scorem['"]>\s*(\d+)/g)].map((x) => +x[1]);
-    out.push({ url: hm[1].startsWith("http") ? hm[1] : hm[1].startsWith("//") ? "https:" + hm[1] : BASE + hm[1], home: parts[0].replace(/-/g, " "), away: parts[1].replace(/-/g, " "), hs: sc.length >= 2 ? sc[0] : null, as: sc.length >= 2 ? sc[1] : null });
+  const out = [], seen = new Set();
+  const re = /href=["']((?:https?:)?\/\/(?:www\.)?mutating\.com\/football-stats\/match-preview-[^"']+|\/football-stats\/match-preview-[^"']+)["']/gi;
+  let m;
+  while ((m = re.exec(html))) {
+    let u = m[1]; if (u.startsWith("//")) u = "https:" + u; else if (u.startsWith("/")) u = BASE + u;
+    u = u.replace("://mutating.com", "://www.mutating.com");
+    if (seen.has(u)) continue; seen.add(u);
+    const s = u.match(/match-preview-(.+?)-stats-h2h-preview-and-prediction-([a-z0-9]+)\/?$/i); if (!s) continue;
+    const parts = s[1].split("-vs-"); if (parts.length !== 2) continue;
+    out.push({ url: u, home: parts[0].replace(/-/g, " "), away: parts[1].replace(/-/g, " ") });
   }
   return out;
 }
+const clean = (s) => String(s == null ? "" : s).replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 export default async (req) => {
   const u = new URL(req.url);
   const home = (u.searchParams.get("home") || "").trim(), away = (u.searchParams.get("away") || "").trim();
-  if (!home || !away) return json({ ok: false, reason: "missing_names" }, 400);
+  let matchUrl = (u.searchParams.get("url") || "").trim();
   const diag = { dayPages: [] };
   try {
-    const days = ["/football-stats/yesterday/", "/football-stats/", "/football-stats/tomorrow/"];
-    const rows = (await Promise.all(days.map(async (d) => {
-      try { const r = await fetchT(BASE + d, { headers: { "user-agent": UA, accept: "text/html" } }); const h = await r.text(); const l = extractRows(h);
-        diag.dayPages.push({ day: d, status: r.status, rows: l.length, withScore: l.filter((x) => x.hs != null).length }); return l; }
-      catch (e) { diag.dayPages.push({ day: d, error: String(e && e.message || e) }); return []; }
-    }))).flat();
-    const sc = rows.map((c) => ({ ...c, sh: nameScore(home, c.home), sa: nameScore(away, c.away) })).sort((a, b) => b.sh + b.sa - (a.sh + a.sa));
-    const best = sc[0];
-    diag.best = best && { home: best.home, away: best.away, sh: +best.sh.toFixed(2), sa: +best.sa.toFixed(2), hs: best.hs, as: best.as };
-    if (!best || best.sh < 0.5 || best.sa < 0.5) return json({ ok: false, reason: "match_not_found", diag });
-    if (best.hs != null) return json({ ok: true, finished: true, hs: best.hs, as: best.as, source: "daylist", diag });
-    // the match page itself shows "FT" and the final score once the game is over
-    const pr = await fetchT(best.url, { headers: { "user-agent": UA, accept: "text/html" } });
-    const html = await pr.text();
-    const text = html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ");
-    const m = text.match(/\bFT\b\s*(\d{1,2})\s*[-\u2013:]\s*(\d{1,2})\b/);
-    diag.page = { url: best.url, status: pr.status, bytes: html.length, ft: !!m };
-    if (m) return json({ ok: true, finished: true, hs: +m[1], as: +m[2], source: "matchpage", diag });
-    return json({ ok: true, finished: false, diag });
+    if (!/^https:\/\/www\.mutating\.com\/football-stats\/match-preview-[a-z0-9-]+\/?$/i.test(matchUrl)) matchUrl = "";
+    if (!matchUrl) {
+      if (!home || !away) return json({ ok: false, reason: "missing_names" }, 400);
+      const days = ["/football-stats/yesterday/", "/football-stats/", "/football-stats/tomorrow/"];
+      const rows = (await Promise.all(days.map(async (d) => {
+        try { const r = await fetchT(BASE + d, { headers: { "user-agent": UA, accept: "text/html" } }); const h = await r.text(); const l = extractRows(h);
+          diag.dayPages.push({ day: d, status: r.status, rows: l.length }); return l; }
+        catch (e) { diag.dayPages.push({ day: d, error: String(e && e.message || e) }); return []; }
+      }))).flat();
+      const sc = rows.map((c) => ({ ...c, sh: nameScore(home, c.home), sa: nameScore(away, c.away) })).sort((a, b) => b.sh + b.sa - (a.sh + a.sa));
+      const best = sc[0];
+      diag.best = best && { url: best.url, sh: +best.sh.toFixed(2), sa: +best.sa.toFixed(2) };
+      if (!best || best.sh < 0.75 || best.sa < 0.75) return json({ ok: false, reason: "match_not_found", diag });
+      matchUrl = best.url;
+    }
+    const code = (matchUrl.match(/prediction-([a-z0-9]+)\/?$/i) || [])[1];
+    if (!code) return json({ ok: false, reason: "no_code", diag });
+    const r = await fetchT(BASE + "/updategame-" + code + "/", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded; charset=UTF-8", "x-requested-with": "XMLHttpRequest", accept: "*/*", referer: matchUrl, origin: BASE, "user-agent": UA },
+      body: "",
+    });
+    const raw = await r.text();
+    diag.post = { status: r.status, raw: raw.slice(0, 400) };
+    let data = null; try { data = JSON.parse(raw); } catch {}
+    if (typeof data === "string") { try { data = JSON.parse(data); } catch {} }
+    const o = Array.isArray(data) ? data[0] : data;
+    if (!o || typeof o !== "object") return json({ ok: false, reason: "bad_response", diag });
+    const time = clean(o.matchgotime), res = clean(o.matchgoresult);
+    const m = res.match(/(\d+)\s*[-:–]\s*(\d+)/);
+    const finished = !!m && /^(FT|AET|PEN|AP|AFTER|FINAL|FINISHED|FULL)/i.test(time);
+    diag.read = { time, res };
+    if (finished) return json({ ok: true, finished: true, hs: +m[1], as: +m[2], status: time, matchUrl, diag });
+    return json({ ok: true, finished: false, status: time || "not started", live: m ? m[1] + "-" + m[2] : null, matchUrl, diag });
   } catch (e) { return json({ ok: false, reason: "error", message: String(e && e.message || e), diag }); }
 };

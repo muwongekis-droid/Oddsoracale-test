@@ -37,27 +37,31 @@ const esc = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // ---------- team-name matching (betPawa name <-> mutating name) ----------
 const STOP = new Set([
-  "fc", "cf", "sc", "ac", "as", "afc", "sk", "fk", "kv", "ud", "cd", "sd", "rc", "ss", "us",
+  "fc", "cf", "sc", "ac", "as", "afc", "sk", "fk", "kv", "ud", "cd", "sd", "rc", "ss", "us", "nk", "ue", "tc", "kf", "gd", "cs", "ca",
   "the", "de", "la", "el", "club", "calcio", "cp", "fsv", "tsv", "vfb", "vfl", "sv", "bk", "if", "ik",
 ]);
-const ALIAS = { wolves: "wolverhampton", spurs: "tottenham", utd: "united", man: "manchester", psg: "paris", gladbach: "monchengladbach" };
-function tokens(name) {
-  return String(name || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .split(" ")
-    .map((t) => ALIAS[t] || t)
-    .filter((t) => t.length > 1 && !STOP.has(t) && !/^\d{4}$/.test(t));
+const GENERIC = new Set(["city", "united", "town", "rovers", "athletic", "real", "sporting", "dynamo", "dinamo", "juniors", "academy", "county", "wanderers", "albion", "rangers", "olympic", "olympique", "sparta", "central", "north", "south", "east", "west", "saint", "santa", "deportivo", "deportes", "atletico", "racing", "inter", "internacional", "sport", "stadium", "utd"]);
+const ALIAS = { wolves: "wolverhampton", spurs: "tottenham", utd: "united", man: "manchester", psg: "paris", gladbach: "monchengladbach", st: "saint" };
+const MARK = /^(women|w|u\d{2}|ii|iii|b|res|reserves|youth)$/;
+function parts(name) {
+  const raw = String(name || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" ").filter(Boolean).map((t) => ALIAS[t] || t);
+  const marks = raw.filter((t) => MARK.test(t)).sort().join(",");
+  const core = raw.filter((t) => !MARK.test(t) && t.length > 1 && !STOP.has(t) && !/^\d{4}$/.test(t));
+  return { marks, core };
 }
 const tokMatch = (a, b) => a === b || (a.length >= 3 && b.length >= 3 && (a.startsWith(b) || b.startsWith(a)));
+const wt = (t) => (GENERIC.has(t) ? 0.35 : 1);
+// 1 = same team, 0 = different. A short name that sits inside a longer one still scores high ("Rudes" in "NK Rudes Zagreb").
 function nameScore(a, b) {
-  const A = tokens(a), B = tokens(b);
-  if (!A.length || !B.length) return 0;
-  const inter = A.filter((x) => B.some((y) => tokMatch(x, y))).length;
-  const union = A.length + B.length - inter;
-  return union ? inter / union : 0;
+  const A = parts(a), B = parts(b);
+  if (!A.core.length || !B.core.length || A.marks !== B.marks) return 0;
+  const sum = (arr) => arr.reduce((s, t) => s + wt(t), 0);
+  const matched = A.core.filter((x) => B.core.some((y) => tokMatch(x, y))).reduce((s, t) => s + wt(t), 0);
+  if (!matched) return 0;
+  const ta = sum(A.core), tb = sum(B.core);
+  if (matched < 1 && (matched < ta - 0.001 || matched < tb - 0.001)) return 0; // only a generic word in common (Inter vs Inter Miami)
+  const overlap = matched / Math.min(ta, tb), jacc = matched / (ta + tb - matched);
+  return 0.8 * overlap + 0.2 * jacc;
 }
 
 // ---------- find the match page from the day lists ----------
@@ -104,7 +108,7 @@ async function findMatch(home, away, diag) {
     .sort((a, b) => b.total - a.total);
   const best = scored[0];
   diag.candidates = scored.slice(0, 3).map((c) => ({ url: c.url, sh: +c.sh.toFixed(2), sa: +c.sa.toFixed(2) }));
-  if (!best || best.sh < 0.5 || best.sa < 0.5) return null;
+  if (!best || best.sh < 0.75 || best.sa < 0.75) return null;
   const second = scored[1];
   if (second && second.total >= best.total - 0.15 && second.url !== best.url) {
     diag.ambiguous = true;
