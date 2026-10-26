@@ -49,7 +49,15 @@ function parts(name) {
   const core = raw.filter((t) => !MARK.test(t) && t.length > 1 && !STOP.has(t) && !/^\d{4}$/.test(t));
   return { marks, core };
 }
-const tokMatch = (a, b) => a === b || (a.length >= 3 && b.length >= 3 && (a.startsWith(b) || b.startsWith(a)));
+function lev(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+// spelling variants (Qadsiah / Qadisiyah): allow 1 typo on 5-6 letter words, 2 on 7+ letters
+const near = (a, b) => { const m = Math.min(a.length, b.length); return m >= 5 && lev(a, b) <= (m >= 7 ? 2 : 1); };
+const tokMatch = (a, b) => a === b || (a.length >= 3 && b.length >= 3 && (a.startsWith(b) || b.startsWith(a))) || near(a, b);
 const wt = (t) => (GENERIC.has(t) ? 0.35 : 1);
 // 1 = same team, 0 = different. A short name that sits inside a longer one still scores high ("Rudes" in "NK Rudes Zagreb").
 function nameScore(a, b) {
@@ -107,7 +115,7 @@ async function findMatch(home, away, diag) {
     .map((c) => ({ ...c, total: c.sh + c.sa }))
     .sort((a, b) => b.total - a.total);
   const best = scored[0];
-  diag.candidates = scored.slice(0, 3).map((c) => ({ url: c.url, sh: +c.sh.toFixed(2), sa: +c.sa.toFixed(2) }));
+  diag.candidates = scored.slice(0, 3).filter((c) => c.total >= 0.5).map((c) => ({ url: c.url, sh: +c.sh.toFixed(2), sa: +c.sa.toFixed(2) }));
   if (!best || best.sh < 0.75 || best.sa < 0.75) return null;
   const second = scored[1];
   if (second && second.total >= best.total - 0.15 && second.url !== best.url) {
