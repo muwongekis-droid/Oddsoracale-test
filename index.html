@@ -937,7 +937,6 @@ function splitFormInput(raw){
   if(parts.length<2)return{l5:raw,l15:""};
   return{l5:parts[0],l15:parts.slice(1).join("\n\n")};
 }
-
 let __lastFetchKey="", __fetching=false, __formByMatch={};
 const __fk=(h,a)=>(h||"").toLowerCase().trim()+"|"+(a||"").toLowerCase().trim();
 function __teamsOf(raw){
@@ -952,6 +951,7 @@ async function __fetchOne(h,a,st,label){
       const x=await r.json();
       if(x.ok)return{ok:true,j:x};
       lastErr=x.reason||"unknown"; console.log(x);
+      try{const c=x.diag&&x.diag.candidates&&x.diag.candidates[0];if(c&&c.url){const sl=(c.url.match(/match-preview-(.+?)-stats-h2h/)||[])[1];if(sl)lastErr+=", closest on mutating: "+sl.replace(/-vs-/," v ").replace(/-/g," ");}}catch(e){}
       if(x.reason==="match_not_found"||x.reason==="ambiguous"||x.reason==="missing_names")break;
     }catch(e){lastErr=e.message;}
     await new Promise(function(res){setTimeout(res,1200);});
@@ -974,7 +974,7 @@ async function fetchMutating(auto){
       if(!res.ok){fails.push(t.home+" v "+t.away+" ("+res.err+")");continue;}
       const j=res.j;
       if(j.approx)approxN++;
-      __formByMatch[__fk(t.home,t.away)]={l5:j.text5,l15:j.text15};
+      __formByMatch[__fk(t.home,t.away)]={l5:j.text5,l15:j.text15,url:j.matchUrl||null};
       if(i===0)document.getElementById("formInput").value=j.text5+"\n\n"+j.text15;
       okN++;
     }
@@ -986,6 +986,7 @@ async function fetchMutating(auto){
   }catch(e){st.textContent="Fetch failed: "+e.message;}
   finally{__fetching=false;fb.disabled=false;}
 }
+
 // ── AUTO RESULTS (test copy) ──
 function gradePick(pick,hs,as){
   const t=String(pick||"").trim(), tot=hs+as; let m;
@@ -1000,7 +1001,7 @@ function gradePick(pick,hs,as){
   if(/^Draw \(1X2\)/i.test(t))return hs===as?"win":"loss";
   if(/^DNB Home/i.test(t)){if(hs===as)return null;return hs>as?"win":"loss";}
   if(/^DNB Away/i.test(t)){if(hs===as)return null;return as>hs?"win":"loss";}
-  if((m=t.match(/^(Home|Away) Team Over ([0-9.]+)/i))){const g=/^home/i.test(m[1])?hs:as;return g>+m[2]?"win":"loss";}
+  if((m=t.match(/(Home|Away) Team Over ([0-9.]+)/i))){const g=/^home/i.test(m[1])?hs:as;return g>+m[2]?"win":"loss";}
   return null; // anything not clearly gradable stays pending
 }
 async function checkResults(){
@@ -1010,9 +1011,9 @@ async function checkResults(){
   try{
     for(const e of log){
       if(!e.homeTeam||!e.awayTeam||!e.picks||!e.picks.some(p=>p.result==="pending"))continue;
-      const key=e.homeTeam+"|"+e.awayTeam;
+      const key=e.muUrl||(e.homeTeam+"|"+e.awayTeam);
       if(!(key in seen)){
-        try{const r=await fetch("/.netlify/functions/results?home="+encodeURIComponent(e.homeTeam)+"&away="+encodeURIComponent(e.awayTeam));seen[key]=await r.json();}
+        try{const r=await fetch("/.netlify/functions/results?home="+encodeURIComponent(e.homeTeam)+"&away="+encodeURIComponent(e.awayTeam)+(e.muUrl?"&url="+encodeURIComponent(e.muUrl):""));seen[key]=await r.json();}
         catch(x){seen[key]={ok:false,reason:"net"};}
       }
       const R=seen[key];
@@ -1057,7 +1058,7 @@ function runAnalysis(){
   clearInterval(iv);thinking.style.display="none";
   let log=loadLog();
   for(const{result}of outcomes){
-    const entry={id:Date.now()+Math.floor(Math.random()*1000),date:new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}),match:result.match,homeTeam:result.homeTeam,awayTeam:result.awayTeam,expectedGoals:result.expectedGoals,expectedGoals5:result.expectedGoals5,expectedGoals15:result.expectedGoals15,mode:"engine"};
+    const entry={id:Date.now()+Math.floor(Math.random()*1000),date:new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}),match:result.match,homeTeam:result.homeTeam,awayTeam:result.awayTeam,expectedGoals:result.expectedGoals,expectedGoals5:result.expectedGoals5,expectedGoals15:result.expectedGoals15,mode:"engine",muUrl:((__formByMatch[__fk(result.homeTeam,result.awayTeam)]||{}).url)||null};
     if(result.picks&&result.picks.length>0){
       log=[{...entry,picks:result.picks.map(p=>({pick:p.market||p.pick,odds:p.odds,score:p.score,confidence:p.confidence,edge:p.edge,trackRate:p.trackRate!=null?p.trackRate:null,trackN:p.trackN!=null?p.trackN:null,result:"pending"}))},...log];
     }else{
@@ -1072,10 +1073,12 @@ function runAnalysis(){
   renderResult(outcomes);
 }
 
-
-// ── CORRECT SCORE (display only; never feeds the pick engine) ──
+// ── ONE SCORE MODEL (display only; never feeds the pick engine) ──
+// A single table of score chances is built from the engine's expected goals + the
+// market odds. The correct score, the per-pick model chances and the agreement
+// check ALL read from that one table, so they cannot drift apart.
 function _pois(l,k){let p=Math.exp(-l);for(let i=1;i<=k;i++)p*=l/i;return p;}
-function correctScore(result,odds){
+function scoreModel(result,odds){
   try{
     if(!odds)return null;
     const hw=+odds.home_win,aw=+odds.away_win,dr=+odds.draw;
@@ -1100,18 +1103,58 @@ function correctScore(result,odds){
     const lh=tot*bs,la=tot*(1-bs),rho=-0.08;
     const tau=function(i,j){if(i===0&&j===0)return 1-lh*la*rho;if(i===0&&j===1)return 1+lh*rho;if(i===1&&j===0)return 1+la*rho;if(i===1&&j===1)return 1-rho;return 1;};
     const cells=[];let sum=0;
-    for(let i=0;i<=7;i++)for(let j=0;j<=7;j++){const q=_pois(lh,i)*_pois(la,j)*tau(i,j);cells.push({i:i,j:j,q:q});sum+=q;}
+    for(let i=0;i<=8;i++)for(let j=0;j<=8;j++){const q=_pois(lh,i)*_pois(la,j)*tau(i,j);cells.push({i:i,j:j,q:q});sum+=q;}
+    cells.forEach(function(c){c.q=c.q/sum;});
     cells.sort(function(a,b){return b.q-a.q;});
-    return{top:cells.slice(0,3).map(function(c){return{score:c.i+"-"+c.j,pct:Math.round(100*c.q/sum)};}),lh:lh,la:la};
+    return{cells:cells,lh:lh,la:la,tot:lh+la,engineXG:T};
   }catch(e){return null;}
 }
+function modelPickProb(M,pk){
+  let w=0,l=0;
+  for(const c of M.cells){const g=gradePick(pk,c.i,c.j);if(g==="win")w+=c.q;else if(g==="loss")l+=c.q;}
+  if(w+l<=0)return null;
+  return Math.round(100*w/(w+l)); // draws are void for DNB picks, so that one is conditional
+}
+function alignment(result,odds){
+  const M=scoreModel(result,odds);
+  if(!M)return null;
+  const picks=((result&&result.picks)||[]).map(function(p){return{name:p.market||p.pick,engine:p.formPct!=null?p.formPct:null};}).filter(function(p){return p.name;});
+  const rows=picks.map(function(p){return{name:p.name,short:String(p.name).replace(/^.*—\s*/,""),engine:p.engine,model:modelPickProb(M,p.name)};});
+  const usable=rows.filter(function(r){return r.model!=null;});
+  const fit=usable.length?M.cells.filter(function(c){return usable.every(function(r){return gradePick(r.name,c.i,c.j)==="win";});}):[];
+  const joint=fit.reduce(function(s,c){return s+c.q;},0);
+  const top=M.cells[0], pick=fit.length?fit[0]:top;
+  const allStrong=usable.length>0&&usable.every(function(r){return r.model>=60;});
+  const xgOk=M.engineXG==null||Math.abs(M.engineXG-M.tot)<=0.8;
+  const aligned=allStrong&&fit.length>0&&top.i===pick.i&&top.j===pick.j&&xgOk;
+  return{M:M,rows:rows,usable:usable,top:top,show:pick,aligned:aligned,constrained:fit.length>0,joint:Math.round(100*joint),conflict:usable.length>0&&!fit.length,agree:usable.filter(function(r){return r.model>=60;}).length,weak:usable.filter(function(r){return r.model<50;})};
+}
+function correctScore(result,odds){ // kept for older callers
+  const A=alignment(result,odds);
+  return A?{score:A.show.i+"-"+A.show.j,pct:Math.round(100*A.show.q),n:A.usable.length,constrained:A.constrained,conflict:A.conflict}:null;
+}
 function correctScoreHTML(result,odds){
-  const c=correctScore(result,odds);
-  if(!c)return "";
-  return "<div style='margin:-6px 0 12px;padding:10px 14px;border:1px solid var(--bd);border-radius:12px;background:var(--card,#fff);display:flex;align-items:center;gap:12px;flex-wrap:wrap'>"+
-    "<span style='font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--dim)'>&#x1F3AF; LIKELY SCORE</span>"+
-    "<span style='font-size:22px;font-weight:800'>"+c.top[0].score+"</span><span style='font-size:12px;color:var(--dim)'>"+c.top[0].pct+"%</span>"+
-    "<span style='font-size:12.5px;color:var(--dim)'>then "+c.top[1].score+" ("+c.top[1].pct+"%) &middot; "+c.top[2].score+" ("+c.top[2].pct+"%)</span></div>";
+  const A=alignment(result,odds);
+  if(!A)return "";
+  const sc=function(c){return c.i+"-"+c.j;};
+  const chip=function(r){
+    const m=r.model;let col="#16a34a",mark="✓";
+    if(m<50){col="#dc2626";mark="⚠";}else if(m<60){col="#d97706";mark="~";}
+    return "<span style='display:inline-block;margin:2px 4px 2px 0;padding:3px 8px;border-radius:999px;font-size:11.5px;border:1px solid "+col+";color:"+col+"'>"+r.short+" "+m+"% "+mark+"</span>";
+  };
+  let h="<div style='margin:-6px 0 12px;padding:12px 14px;border:1px solid var(--bd);border-radius:12px;background:var(--card,#fff)'>";
+  h+="<div style='display:flex;align-items:center;gap:12px;flex-wrap:wrap'><span style='font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--dim)'>&#x1F3AF; CORRECT SCORE</span><span style='font-size:22px;font-weight:800'>"+sc(A.show)+"</span>"+(A.aligned?"<span style='font-size:11px;font-weight:800;letter-spacing:.06em;padding:3px 9px;border-radius:999px;background:#16a34a;color:#fff'>&#x2705; ALL ALIGNED</span>":"")+"<span style='font-size:12px;color:var(--dim)'>"+Math.round(100*A.show.q)+"%"+(A.usable.length&&A.constrained?" &middot; fits all "+A.usable.length+" pick"+(A.usable.length!==1?"s":""):"")+"</span></div>";
+  if(A.usable.length){
+    h+="<div style='margin-top:6px'><span style='font-size:11px;color:var(--dim)'>Model chance of each pick:</span><br>"+A.usable.map(chip).join("")+"</div>";
+    h+="<div style='font-size:12px;color:var(--dim);margin-top:4px'>Model agrees with "+A.agree+" of "+A.usable.length+" pick"+(A.usable.length!==1?"s":"")+(A.constrained?" &middot; all picks land together: "+A.joint+"%":"")+"</div>";
+  }
+  const notes=[];
+  if(A.conflict)notes.push("No score satisfies all picks at once, so the score shown is the model's own top score.");
+  if(A.constrained&&sc(A.top)!==sc(A.show))notes.push("Model's own top score is "+sc(A.top)+" ("+Math.round(100*A.top.q)+"%), which does not satisfy every pick.");
+  if(A.weak.length)notes.push("⚠ Model disagrees with: "+A.weak.map(function(r){return r.short+" ("+r.model+"%)";}).join(", ")+".");
+  if(A.M.engineXG!=null&&Math.abs(A.M.engineXG-A.M.tot)>0.8)notes.push("Engine xG "+(+A.M.engineXG).toFixed(1)+" vs model goals "+A.M.tot.toFixed(1)+" (market odds pull the model lower or higher).");
+  if(notes.length)h+="<div style='font-size:12px;margin-top:6px;color:#b45309;line-height:1.5'>"+notes.join("<br>")+"</div>";
+  return h+"</div>";
 }
 function buildMatchHTML(result,odds,form){
   const noPick=!result.picks||result.picks.length===0||result.no_pick_reason;
