@@ -142,6 +142,10 @@ textarea:focus{outline:none;border-color:var(--silver3);}
   <div class="tab" id="tabLog" onclick="switchTab('log')">&#x1F4CB; Log</div>
 </div>
 <div id="analyseTab" class="zone">
+<div id="slipWrap" style="margin-bottom:12px">
+    <button class="run-btn" type="button" onclick="buildSlips()" style="background:linear-gradient(135deg,#0d9488,#7c3aed);margin-bottom:8px">&#x1F3AF; Build today&#39;s 2 slips (Over 2.5 + 1X2, 2 legs each, 2.20&ndash;2.50)</button>
+    <div id="slipOut"></div>
+  </div>
   <div id="inputSection">
     <div>
       <div class="box-label">Odds Board <span class="opt-tag">up to 10 matches</span></div>
@@ -190,6 +194,7 @@ textarea:focus{outline:none;border-color:var(--silver3);}
     <div id="backupMsg" style="font-size:12px;margin-top:8px;color:var(--dim)"></div>
   </div>
   <div style="margin:0 0 10px"><button class="btn-sm" id="resBtn" style="width:100%;padding:11px" onclick="checkResults()">&#x1F4CA; Check results (auto-mark finished matches)</button><div id="resMsg" style="font-size:12px;margin-top:6px;color:var(--dim)"></div></div>
+  <div id="slipTrack"></div>
   <div id="logContent"></div>
 </div>
 <script>
@@ -205,11 +210,166 @@ textarea:focus{outline:none;border-color:var(--silver3);}
 // ── STORAGE ──
 const loadLog=()=>{try{return JSON.parse(localStorage.getItem("oo_log")||"[]");}catch{return[];}};
 const saveLog=log=>{try{localStorage.setItem("oo_log",JSON.stringify(log.slice(0,5000)));}catch{}};
+// ── DAILY SLIPS (test copy): 2 legs each, total odds 2.20-2.50 ──
+const SLIP_MIN=2.20,SLIP_MAX=2.50;
+function __slipCands(minScore){
+  const today=new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"});
+  const seen=new Set(),ents=[];
+  for(const e of loadLog()){if(e.date!==today||e.noPick||!e.picks||!e.picks.length)continue;const k=(e.homeTeam||e.match)+"|"+(e.awayTeam||"");if(seen.has(k))continue;seen.add(k);ents.push(e);}
+  const over=[],full=[];
+  for(const e of ents){
+    const P=e.picks,sc=p=>parseFloat(p.score)||0,txt=p=>String(p.pick||"").trim();
+    const o15=P.find(p=>/^over 1\.5$/i.test(txt(p))),o25=P.find(p=>/^over 2\.5$/i.test(txt(p)));
+    const x12=P.find(p=>/^(home|away) win \(1x2\)/i.test(txt(p)));
+    const goalsLock=!!(o15&&o25&&sc(o15)>=9&&sc(o25)>=8);
+    const sure=!!(x12&&o15&&o25&&sc(x12)>=9.95&&sc(o15)>=9.95&&sc(o25)>=9.95);
+    const xg=(e.expectedGoals5!=null&&e.expectedGoals15!=null)?Math.min(e.expectedGoals5,e.expectedGoals15):(e.expectedGoals!=null?e.expectedGoals:null);
+    for(const p of P){
+      const t=txt(p),isO=/^over (1\.5|2\.5)$/i.test(t),is1=/^(home|away) win \(1x2\)/i.test(t);
+      if(!isO&&!is1)continue;
+      const s=sc(p),odds=parseFloat(p.odds);
+      if(!(odds>1)||s<minScore)continue;
+      const ver=s>=9.95&&p.trackRate!=null&&p.trackN!=null&&p.trackRate>=85&&p.trackN>=10;
+      const tags=[];let pts=0;
+      pts+=s>=9.95?3:s>=9?1.5:0.5; if(s>=9.95)tags.push("10/10");else tags.push(s+"/10");
+      if(ver){pts+=3;tags.push("✅ VERIFIED");}
+      if(sure){pts+=2;tags.push("\u{1F48E} SURE LOCK");}
+      if(isO&&goalsLock){pts+=2;tags.push("\u{1F512} GOALS LOCK");}
+      if(isO&&xg!=null&&xg>=3){pts+=2;}
+      if(xg!=null)tags.push("xG "+xg);
+      if(e.cs)tags.push("\u{1F3AF} "+e.cs+(e.csPct?" ("+e.csPct+"%)":"")+(e.aligned?" aligned":""));
+      if(p.trackRate!=null){pts+=p.trackRate/100;tags.push(p.trackRate+"% ("+p.trackN+")");}
+      const c={m:e.match||(e.homeTeam+" vs "+e.awayTeam),mk:(e.homeTeam||"")+"|"+(e.awayTeam||""),pick:t,odds,pts,tags};
+      (isO?over:full).push(c);
+    }
+  }
+  return{over,full,n:ents.length};
+}
+function __bestPair(pool,used){
+  let best=null;
+  const L=pool.filter(c=>!used.has(c.mk));
+  for(let i=0;i<L.length;i++)for(let j=i+1;j<L.length;j++){
+    if(L[i].mk===L[j].mk)continue;
+    const prod=Math.round(L[i].odds*L[j].odds*100)/100;
+    if(prod<SLIP_MIN||prod>SLIP_MAX)continue;
+    const pts=L[i].pts+L[j].pts;
+    if(!best||pts>best.pts+1e-9||(Math.abs(pts-best.pts)<1e-9&&prod<best.prod))best={a:L[i],b:L[j],prod,pts};
+  }
+  return best;
+}
+function __slipFor(kind,used){
+  for(const minScore of [9,8]){
+    let pool=__slipCands(minScore)[kind];
+    if(kind==="over")pool=pool.filter(c=>c.pick==="Over 2.5");
+    const b=__bestPair(pool,used);
+    if(b){b.relaxed=minScore<9;return b;}
+  }
+  return null;
+}
+function __slipCard(title,b){
+  if(!b)return "<div style='background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;padding:12px 14px;margin-bottom:10px'><div style='font-weight:800;font-size:13px;margin-bottom:4px'>"+title+"</div><div style='font-size:12.5px;color:var(--dim)'>No safe 2-leg pair lands between "+SLIP_MIN.toFixed(2)+" and "+SLIP_MAX.toFixed(2)+" today. Skip this slip.</div></div>";
+  const leg=c=>"<div style='padding:8px 0;border-top:1px solid var(--bd)'><div style='font-weight:700;font-size:13px'>"+c.m+"</div><div style='font-size:13px;margin-top:2px'><b>"+c.pick+"</b> @ <b>"+c.odds.toFixed(2)+"</b></div><div style='font-size:11px;color:var(--dim);margin-top:3px'>"+c.tags.join(" &middot; ")+"</div></div>";
+  return "<div style='background:var(--s2);border:2px solid #0d9488;border-radius:12px;padding:12px 14px;margin-bottom:10px'><div style='display:flex;justify-content:space-between;align-items:center'><div style='font-weight:800;font-size:13px'>"+title+"</div><div style='font-weight:800;font-size:15px;color:#0d9488'>"+b.prod.toFixed(2)+"</div></div>"+(b.relaxed?"<div style='font-size:11px;color:#b45309;margin-top:3px'>Relaxed: no 9+ pair fit, used 8+ scores.</div>":"")+leg(b.a)+leg(b.b)+"</div>";
+}
+function __o25Best2(){
+  for(const minScore of [9,8]){
+    const pool=__slipCands(minScore).over.filter(c=>c.pick==="Over 2.5").sort((x,y)=>y.pts-x.pts||x.odds-y.odds);
+    const out=[];const seen=new Set();
+    for(const c of pool){if(seen.has(c.mk))continue;seen.add(c.mk);out.push(c);if(out.length===2)break;}
+    if(out.length){out.relaxed=minScore<9;return out;}
+  }
+  return [];
+}
+function __o25Card(L){
+  if(!L.length)return "<div style='background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;padding:12px 14px;margin-bottom:10px'><div style='font-weight:800;font-size:13px;margin-bottom:4px'>Over 2.5 best picks</div><div style='font-size:12.5px;color:var(--dim)'>No Over 2.5 pick scored 8+ today.</div></div>";
+  return "<div style='background:var(--s2);border:2px solid #2563eb;border-radius:12px;padding:12px 14px;margin-bottom:10px'><div style='font-weight:800;font-size:13px'>Over 2.5 &middot; best 2 (singles)</div>"+(L.relaxed?"<div style='font-size:11px;color:#b45309;margin-top:3px'>Relaxed: used 8+ scores.</div>":"")+L.map(c=>"<div style='padding:8px 0;border-top:1px solid var(--bd);margin-top:6px'><div style='font-weight:700;font-size:13px'>"+c.m+"</div><div style='font-size:13px;margin-top:2px'><b>Over 2.5</b> @ <b>"+c.odds.toFixed(2)+"</b></div><div style='font-size:11px;color:var(--dim);margin-top:3px'>"+c.tags.join(" &middot; ")+"</div></div>").join("")+"</div>";
+}
+function __saveSlipRecord(A,B,O){
+  try{
+    const today=new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"});
+    const leg=c=>({m:c.m,mk:c.mk,pick:c.pick,odds:c.odds});
+    const rec={date:today,over:A?[leg(A.a),leg(A.b)]:[],full:B?[leg(B.a),leg(B.b)]:[],o25:(O||[]).map(leg)};
+    const all=JSON.parse(localStorage.getItem("oo_slips")||"[]").filter(r=>r.date!==today);
+    all.unshift(rec);localStorage.setItem("oo_slips",JSON.stringify(all.slice(0,400)));
+  }catch(e){}
+}
+function buildSlips(){
+  const out=document.getElementById("slipOut");
+  try{
+    const n=__slipCands(8).n;
+    if(!n){out.innerHTML="<div class='box-sub'>No matches analysed today yet. Analyse your matches first, then tap again.</div>";return;}
+    const used=new Set();
+    const A=__slipFor("over",used);if(A){used.add(A.a.mk);used.add(A.b.mk);}
+    const B=__slipFor("full",used);
+    const O=[];
+    window.__slips={A,B,O};
+    __saveSlipRecord(A,B,O);
+    out.innerHTML="<div class='box-sub' style='margin-bottom:8px'>Built from "+n+" matches analysed today. The Over 2.5 slip is built first, then the Full Time slip from what's left. Saved to your Slip tracker in the Log tab.</div>"+__slipCard("Slip 1 &middot; Over 2.5 (2 legs)",A)+__slipCard("Slip 2 &middot; Full Time (1X2)",B)+"<button class='btn-sm' style='width:100%;padding:10px;margin-bottom:6px' onclick='copySlips()'>&#x1F4CB; Copy all</button><div id='slipCopyMsg' style='font-size:12px;color:var(--dim)'></div>";
+  }catch(e){out.innerHTML="<div class='error-box'>Slip builder failed: "+(e&&e.message||e)+"</div>";}
+}
+// ── SLIP TRACKER: grades saved slips from the log's own results ──
+function __legResult(date,leg){
+  const e=loadLog().find(x=>x.date===date&&((x.homeTeam||"")+"|"+(x.awayTeam||""))===leg.mk);
+  if(!e)return"pending";
+  const p=(e.picks||[]).find(q=>String(q.pick||"").trim()===leg.pick&&Math.abs(parseFloat(q.odds)-leg.odds)<0.011);
+  return p?p.result:"pending";
+}
+function __legInfo(date,leg){
+  const e=loadLog().find(x=>x.date===date&&((x.homeTeam||"")+"|"+(x.awayTeam||""))===leg.mk);
+  if(!e)return{r:"pending"};
+  const ps=e.picks||[];const p=ps.find(q=>String(q.pick||"").trim()===leg.pick&&Math.abs(parseFloat(q.odds)-leg.odds)<0.011);
+  const fs=(ps.find(q=>q.finalScore)||{}).finalScore||null;
+  return{r:p?p.result:"pending",fs,cs:e.cs||null};
+}
+function __legLine(date,l){
+  const i=__legInfo(date,l);const col=i.r==="win"?"#16a34a":i.r==="loss"?"#dc2626":"#9090a8";
+  return "<div style='font-size:11.5px;color:var(--dim);padding-left:8px'>"+l.m+" &middot; "+l.pick+" @ "+l.odds.toFixed(2)+" <span style='color:"+col+";font-weight:700'>"+(i.r==="win"?"W":i.r==="loss"?"L":i.r==="void"?"VOID":"&#x23F3;")+"</span>"+(i.cs?" &middot; predicted "+i.cs:"")+(i.fs?" &middot; <b>actual "+i.fs+"</b>":"")+"</div>";
+}
+function __slipStatus(date,legs){
+  if(!legs.length)return null;
+  const r=legs.map(l=>__legResult(date,l));
+  if(r.includes("loss"))return"loss";
+  if(r.every(x=>x==="win"))return"win";
+  return"pending";
+}
+function renderSlipTracker(){
+  const el=document.getElementById("slipTrack");if(!el)return;
+  let recs=[];try{recs=JSON.parse(localStorage.getItem("oo_slips")||"[]");}catch{}
+  if(!recs.length){el.innerHTML="";return;}
+  const tot={over:{w:0,l:0,p:0,net:0},full:{w:0,l:0,p:0,net:0},o25:{w:0,l:0,p:0,net:0}};
+  const rows=recs.map(r=>{
+    const cell=(k,label)=>{
+      if(k==="o25"){
+        if(!r.o25.length)return "";
+        const parts=r.o25.map(l=>{const x=__legResult(r.date,l);const t=x==="win"?"w":x==="loss"?"l":"p";tot.o25[t]++;if(x==="win")tot.o25.net+=1000*(l.odds-1);if(x==="loss")tot.o25.net-=1000;return "<span style='color:"+(x==="win"?"#16a34a":x==="loss"?"#dc2626":"#9090a8")+"'>"+(x==="win"?"W":x==="loss"?"L":"&#x23F3;")+"</span>";});
+        return "<div style='font-size:12px'><b>"+label+"</b> "+parts.join(" ")+"</div>"+r.o25.map(l=>__legLine(r.date,l)).join("");
+      }
+      const legs=r[k];const st=__slipStatus(r.date,legs);if(!st)return "";
+      const prod=legs.reduce((m,l)=>m*l.odds,1);
+      const t=st==="win"?"w":st==="loss"?"l":"p";tot[k][t]++;
+      if(st==="win")tot[k].net+=1000*(prod-1);if(st==="loss")tot[k].net-=1000;
+      return "<div style='font-size:12px'><b>"+label+"</b> "+prod.toFixed(2)+" <span style='color:"+(st==="win"?"#16a34a":st==="loss"?"#dc2626":"#9090a8")+";font-weight:700'>"+(st==="win"?"WIN":st==="loss"?"LOSS":"&#x23F3;")+"</span></div>"+legs.map(l=>__legLine(r.date,l)).join("");
+    };
+    return "<div style='padding:7px 0;border-top:1px solid var(--bd)'><div style='font-size:11px;color:var(--dim);margin-bottom:2px'>"+r.date+"</div>"+cell("over","Over 2.5 slip")+cell("full","1X2 slip")+cell("o25","Over 2.5 best 2")+"</div>";
+  }).join("");
+  const line=(name,t)=>{const d=t.w+t.l;return "<div><span style='color:var(--dim)'>"+name+"</span><br><b>"+(d?Math.round(100*t.w/d)+"%":"-")+"</b> <span style='color:var(--dim)'>("+t.w+"W-"+t.l+"L"+(t.p?", "+t.p+" open":"")+")"+(d?" &middot; "+(t.net>=0?"+":"")+Math.round(t.net).toLocaleString()+"</span>":"</span>")+"</div>";};
+  el.innerHTML="<div style='background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;margin-bottom:14px;padding:11px 14px'><div style='font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:8px'>&#x1F4C8; Slip tracker (1,000 flat stake)</div><div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px;margin-bottom:6px'>"+line("Over 2.5 slip",tot.over)+line("1X2 slip",tot.full)+line("Over 2.5 best 2",tot.o25)+"</div>"+rows+"</div>";
+}
+function copySlips(){
+  const S=window.__slips||{};const fmt=(t,b)=>b?(t+" ("+b.prod.toFixed(2)+")\n"+[b.a,b.b].map(c=>"- "+c.m+": "+c.pick+" @ "+c.odds.toFixed(2)).join("\n")):t+": no safe pair today";
+  const txt=fmt("SLIP 1 - OVER",S.A)+"\n\n"+fmt("SLIP 2 - FULL TIME",S.B)+"\n\nOVER 2.5 BEST 2\n"+((S.O||[]).map(c=>"- "+c.m+": Over 2.5 @ "+c.odds.toFixed(2)).join("\n")||"none today");
+  const m=document.getElementById("slipCopyMsg");
+  const done=()=>{if(m)m.textContent="Copied.";};
+  try{navigator.clipboard.writeText(txt).then(done,()=>{const t=document.createElement("textarea");t.value=txt;document.body.appendChild(t);t.select();document.execCommand("copy");t.remove();done();});}
+  catch(e){const t=document.createElement("textarea");t.value=txt;document.body.appendChild(t);t.select();try{document.execCommand("copy");}catch{}t.remove();done();}
+}
+
 // ── BACKUP / RESTORE ──
 function exportLog(){
   const m=document.getElementById("backupMsg");
   try{
-    const data={app:"OddsOracle-test",exported:new Date().toISOString(),log:loadLog()};
+    let sl=[];try{sl=JSON.parse(localStorage.getItem("oo_slips")||"[]");}catch{}
+    const data={app:"OddsOracle-test",exported:new Date().toISOString(),log:loadLog(),slips:sl};
     const txt=JSON.stringify(data);
     const d=new Date(),pad=n=>String(n).padStart(2,"0");
     const name="oddsoracle-backup-"+d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"-"+pad(d.getHours())+pad(d.getMinutes())+".json";
@@ -229,7 +389,9 @@ function restoreLog(inp){
       const replace=cur.length&&!confirm("Backup has "+inc.length+" matches; your log has "+cur.length+".\n\nOK = merge (keep both, skip duplicates)\nCancel = stop");
       if(replace){m.textContent="Nothing changed.";inp.value="";return;}
       const seen=new Set(cur.map(e=>JSON.stringify(e)));const add=inc.filter(e=>!seen.has(JSON.stringify(e)));
-      saveLog(cur.concat(add));renderLog();
+      saveLog(cur.concat(add));
+      if(Array.isArray(data.slips)){try{const have=JSON.parse(localStorage.getItem("oo_slips")||"[]");const hd=new Set(have.map(r=>r.date));localStorage.setItem("oo_slips",JSON.stringify(have.concat(data.slips.filter(r=>!hd.has(r.date)))));}catch{}}
+      renderLog();
       m.style.color="var(--green,#16a34a)";m.textContent="Restored: "+add.length+" new matches added, "+(inc.length-add.length)+" were already there.";
     }catch(e){m.style.color="#dc2626";m.textContent="Could not read that file: "+(e&&e.message||e);}
     inp.value="";
@@ -1215,8 +1377,8 @@ function buildMatchHTML(result,odds,form){
     : result.expectedGoals!=null?" &middot; ~"+result.expectedGoals+" xG":"";
   let html="<div class='result-banner'><div class='result-eye'>&#x26A1; Oracle &mdash; "+(noPick?"no qualifying picks":(result.picks.length+" pick"+(result.picks.length!==1?"s":"")+" found"))+"</div><div class='result-match'>"+result.match+"</div><div class='result-mode'>&#x26A1; Rules Engine &mdash; "+(result._mkt||0)+" markets scanned"+xgTag+"</div></div>"+correctScoreHTML(result,odds);
   const goalsLock=!noPick&&(()=>{
-    const o15=result.picks.find(p=>(p.market||p.pick||"").toLowerCase().includes("over 1.5"));
-    const o25=result.picks.find(p=>(p.market||p.pick||"").toLowerCase().includes("over 2.5"));
+    const o15=result.picks.find(p=>getMarketType(p.market||p.pick)==="Over 1.5");
+    const o25=result.picks.find(p=>getMarketType(p.market||p.pick)==="Over 2.5");
     if(o15&&o25){const s15=parseFloat(o15.market_score||o15.score||0),s25=parseFloat(o25.market_score||o25.score||0);if(s15>=9&&s25>=8)return{o15,o25,both10:s15>=10&&s25>=10};}
     return null;
   })();
@@ -1226,8 +1388,8 @@ function buildMatchHTML(result,odds,form){
   const sureLock=!noPick&&(()=>{
     const is10=p=>(parseFloat(p.market_score||p.score)||0)>=9.95;
     const oneXtwo=result.picks.find(p=>{const t=(p.market||p.pick||"").toLowerCase();return t.includes("1x2")&&(t.includes("home win")||t.includes("away win"));});
-    const o15=result.picks.find(p=>(p.market||p.pick||"").toLowerCase().includes("over 1.5"));
-    const o25=result.picks.find(p=>(p.market||p.pick||"").toLowerCase().includes("over 2.5"));
+    const o15=result.picks.find(p=>getMarketType(p.market||p.pick)==="Over 1.5");
+    const o25=result.picks.find(p=>getMarketType(p.market||p.pick)==="Over 2.5");
     if(oneXtwo&&o15&&o25&&is10(oneXtwo)&&is10(o15)&&is10(o25))return{oneXtwo,o15,o25};
     return null;
   })();
@@ -1409,7 +1571,7 @@ let noPickBoxOpen=false;
 function toggleNoPickBox(){noPickBoxOpen=!noPickBoxOpen;renderLog();}
 let over25BoxOpen=false;
 function toggleOver25Box(){over25BoxOpen=!over25BoxOpen;renderLog();}
-function renderLog(){setTimeout(backupReminder,0);
+function renderLog(){setTimeout(backupReminder,0);setTimeout(renderSlipTracker,0);
   const rawLog=loadLog();
   // Favorited matches float to the top; otherwise keep the existing (newest-first) order.
   const fullLog=[...rawLog].sort((a,b)=>(b.favorite?1:0)-(a.favorite?1:0));
@@ -1571,7 +1733,7 @@ function renderLog(){setTimeout(backupReminder,0);
         ? "L5: "+entry.expectedGoals5+" &middot; L15: "+entry.expectedGoals15+" xG"
         : entry.expectedGoals!=null?entry.expectedGoals+" xG":null;
       const __act=(picks.find(p=>p.finalScore)||{}).finalScore;
-      const csTag=entry.cs?"<span style=\"font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(37,99,235,0.08);color:#2563eb;border:1px solid rgba(37,99,235,0.25);margin-left:6px\">&#x1F3AF; "+entry.cs+" ("+entry.csPct+"%)"+(__act?" &middot; actual "+__act:"")+"</span>"+(entry.aligned?"<span style=\"font-size:10px;font-weight:800;padding:2px 7px;border-radius:999px;background:#16a34a;color:#fff;margin-left:6px\">&#x2705; ALIGNED</span>":""):"";
+      const csTag=entry.cs?"<span style=\"font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(37,99,235,0.08);color:#2563eb;border:1px solid rgba(37,99,235,0.25);margin-left:6px;white-space:nowrap;display:inline-block;margin-top:3px\">&#x1F3AF; "+entry.cs+" ("+entry.csPct+"%)"+(__act?" &middot; actual "+__act:"")+"</span>"+(entry.aligned?"<span style=\"font-size:10px;font-weight:800;padding:2px 7px;border-radius:999px;background:#16a34a;color:#fff;margin-left:6px;white-space:nowrap;display:inline-block;margin-top:3px\">&#x2705; ALIGNED</span>":""):"";
       const goalsTag=goalsTagText?"<span style=\"font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(217,119,6,0.1);color:var(--amber);border:1px solid rgba(217,119,6,0.25);margin-left:6px\">&#x26BD; "+goalsTagText+"</span>":"";
       // GOALS LOCK — same rule as the Analyse tab: Over 1.5 (score>=9) AND Over 2.5
       // (score>=8) both present in the SAME match. Tags only those two picks, not
@@ -1613,7 +1775,7 @@ function renderLog(){setTimeout(backupReminder,0);
           const isVerifiedLockPick=isVerifiedPick(p);
           const verifiedLockTag=isVerifiedLockPick?"<span style=\"font-size:10px;font-weight:800;letter-spacing:0.05em;padding:2px 8px;border-radius:999px;background:linear-gradient(135deg,#2dd4bf,#0d9488);color:#fff\">&#x2705; VERIFIED LOCK</span>":"";
           const sureLockTag=(!isVerifiedLockPick&&isSureLockPick)?"<span style=\"font-size:10px;font-weight:800;letter-spacing:0.05em;padding:2px 8px;border-radius:999px;background:linear-gradient(135deg,#a78bfa,#7c3aed);color:#fff\">&#x1F48E; SURE LOCK</span>":"";
-          const bestBetTag=(!isSureLockPick&&isBestBet)?"<span style=\"font-size:10px;font-weight:800;letter-spacing:0.05em;padding:2px 8px;border-radius:999px;background:linear-gradient(135deg,#f5d76e,#d4a017);color:#3a2a00\">&#x2B50; BEST BET</span>":"";
+          const bestBetTag=(!isSureLockPick&&!isVerifiedLockPick&&isBestBet)?"<span style=\"font-size:10px;font-weight:800;letter-spacing:0.05em;padding:2px 8px;border-radius:999px;background:linear-gradient(135deg,#f5d76e,#d4a017);color:#3a2a00\">&#x2B50; BEST BET</span>":"";
           // Verified Lock (teal) > Sure Lock (purple) > Best Bet (gold) > Goals
           // Lock (green) for border priority when a pick qualifies for more than one.
           const rowBorder=isVerifiedLockPick?"border-left:3px solid #0d9488;background:rgba(13,148,136,0.07);":isSureLockPick?"border-left:3px solid #7c3aed;background:rgba(124,58,237,0.06);":isBestBet?"border-left:3px solid #d4a017;background:rgba(212,160,23,0.05);":isGoalsLockPick?"border-left:3px solid #16a34a;background:rgba(22,163,74,0.05);":"";
