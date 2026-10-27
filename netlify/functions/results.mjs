@@ -16,9 +16,21 @@ const STOP = new Set([
 const GENERIC = new Set(["city", "united", "town", "rovers", "athletic", "real", "sporting", "dynamo", "dinamo", "juniors", "academy", "county", "wanderers", "albion", "rangers", "olympic", "olympique", "sparta", "central", "north", "south", "east", "west", "saint", "santa", "deportivo", "deportes", "atletico", "racing", "inter", "internacional", "sport", "stadium", "utd"]);
 const ALIAS = { wolves: "wolverhampton", spurs: "tottenham", utd: "united", man: "manchester", psg: "paris", gladbach: "monchengladbach", st: "saint", cologne: "koln", praha: "prague", prag: "prague", brondby: "broendby", munchen: "munich", koeln: "koln" };
 const MARK = /^(women|w|u\d{2}|ii|iii|b|res|reserves|youth)$/;
+// mutating calls reserve / youth sides "II", betPawa calls them "B" or "U23": treat them as one kind. Women stay separate.
+const markClass = (t) => (/^(women|w)$/.test(t) ? "w" : "r");
 function parts(name) {
-  const raw = String(name || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" ").filter(Boolean).map((t) => ALIAS[t] || t);
-  const marks = raw.filter((t) => MARK.test(t)).sort().join(",");
+  let raw = String(name || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" ").filter(Boolean).map((t) => ALIAS[t] || t);
+  // "f b c" / "F.B.C." -> "fbc" (otherwise the lone "b" is read as a reserve-team mark)
+  const joined = [];
+  for (let i = 0; i < raw.length; i++) {
+    if (raw[i].length === 1 && /[a-z]/.test(raw[i]) && raw[i + 1] && raw[i + 1].length === 1 && /[a-z]/.test(raw[i + 1])) {
+      let j = i, w = "";
+      while (j < raw.length && raw[j].length === 1 && /[a-z]/.test(raw[j])) w += raw[j++];
+      joined.push(w); i = j - 1;
+    } else joined.push(raw[i]);
+  }
+  raw = joined;
+  const marks = [...new Set(raw.filter((t) => MARK.test(t)).map(markClass))].sort().join(",");
   const core = raw.filter((t) => !MARK.test(t) && t.length > 1 && !STOP.has(t) && !/^\d{4}$/.test(t));
   return { marks, core };
 }
@@ -43,7 +55,9 @@ function nameScore(a, b) {
   const matched = A.core.filter((x) => B.core.some((y) => tokMatch(x, y))).reduce((s, t) => s + wt(t), 0);
   if (!matched) return 0;
   const ta = sum(A.core), tb = sum(B.core);
-  if (matched < 1 && (matched < ta - 0.001 || matched < tb - 0.001)) return 0; // only a generic word in common (Inter vs Inter Miami)
+  if (matched < 1 && matched < ta - 0.001 && matched < tb - 0.001) return 0; // only a generic word in common (Real Madrid vs Real Betis)
+  // one name sits fully inside the other and the shared part is generic ("Inter" in "Inter Milano"): weak, only good enough when the other team matches strongly
+  if (matched < 1 && (matched < ta - 0.001 || matched < tb - 0.001)) return 0.45;
   const overlap = matched / Math.min(ta, tb), jacc = matched / (ta + tb - matched);
   return 0.8 * overlap + 0.2 * jacc;
 }
