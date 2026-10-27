@@ -180,6 +180,15 @@ textarea:focus{outline:none;border-color:var(--silver3);}
       <div id="importMsg" style="font-size:12px;margin-top:8px"></div>
     </div>
   </div>
+  <div style="background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;margin-bottom:10px;padding:11px 14px">
+    <div style="font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:8px">&#x1F4BE; Backup your log</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-sm" style="flex:1;padding:10px" onclick="exportLog()">&#x2B07; Export backup</button>
+      <button class="btn-sm" style="flex:1;padding:10px" onclick="document.getElementById('restoreFile').click()">&#x2B06; Restore backup</button>
+    </div>
+    <input type="file" id="restoreFile" accept=".json,application/json,text/plain" style="display:none" onchange="restoreLog(this)">
+    <div id="backupMsg" style="font-size:12px;margin-top:8px;color:var(--dim)"></div>
+  </div>
   <div style="margin:0 0 10px"><button class="btn-sm" id="resBtn" style="width:100%;padding:11px" onclick="checkResults()">&#x1F4CA; Check results (auto-mark finished matches)</button><div id="resMsg" style="font-size:12px;margin-top:6px;color:var(--dim)"></div></div>
   <div id="logContent"></div>
 </div>
@@ -196,6 +205,42 @@ textarea:focus{outline:none;border-color:var(--silver3);}
 // ── STORAGE ──
 const loadLog=()=>{try{return JSON.parse(localStorage.getItem("oo_log")||"[]");}catch{return[];}};
 const saveLog=log=>{try{localStorage.setItem("oo_log",JSON.stringify(log.slice(0,5000)));}catch{}};
+// ── BACKUP / RESTORE ──
+function exportLog(){
+  const m=document.getElementById("backupMsg");
+  try{
+    const data={app:"OddsOracle-test",exported:new Date().toISOString(),log:loadLog()};
+    const txt=JSON.stringify(data);
+    const d=new Date(),pad=n=>String(n).padStart(2,"0");
+    const name="oddsoracle-backup-"+d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"-"+pad(d.getHours())+pad(d.getMinutes())+".json";
+    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"application/json"}));a.download=name;document.body.appendChild(a);a.click();a.remove();
+    try{localStorage.setItem("oo_lastBackup",String(Date.now()));}catch{}
+    m.style.color="var(--green,#16a34a)";m.textContent="Saved "+data.log.length+" matches to your Downloads as "+name+". Send it to yourself on WhatsApp or Drive so it survives a lost phone.";
+  }catch(e){m.style.color="#dc2626";m.textContent="Export failed: "+(e&&e.message||e);}
+}
+function restoreLog(inp){
+  const m=document.getElementById("backupMsg");const f=inp.files&&inp.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const data=JSON.parse(r.result);const inc=Array.isArray(data)?data:data.log;
+      if(!Array.isArray(inc))throw new Error("not a backup file");
+      const cur=loadLog();
+      const replace=cur.length&&!confirm("Backup has "+inc.length+" matches; your log has "+cur.length+".\n\nOK = merge (keep both, skip duplicates)\nCancel = stop");
+      if(replace){m.textContent="Nothing changed.";inp.value="";return;}
+      const seen=new Set(cur.map(e=>JSON.stringify(e)));const add=inc.filter(e=>!seen.has(JSON.stringify(e)));
+      saveLog(cur.concat(add));renderLog();
+      m.style.color="var(--green,#16a34a)";m.textContent="Restored: "+add.length+" new matches added, "+(inc.length-add.length)+" were already there.";
+    }catch(e){m.style.color="#dc2626";m.textContent="Could not read that file: "+(e&&e.message||e);}
+    inp.value="";
+  };
+  r.readAsText(f);
+}
+function backupReminder(){
+  try{const t=+localStorage.getItem("oo_lastBackup")||0;const n=loadLog().length;const m=document.getElementById("backupMsg");
+    if(m&&n&&(!t||Date.now()-t>3*864e5)){m.style.color="#d97706";m.textContent=t?"Last backup was "+Math.floor((Date.now()-t)/864e5)+" days ago - export a new one.":"No backup yet - tap Export backup.";}}catch{}
+}
+
 
 // ── HELPERS ──
 const imp=o=>(!o||o<=1)?0:+((1/o)*100).toFixed(1);
@@ -988,6 +1033,7 @@ async function fetchMutating(auto){
 }
 
 // ── AUTO RESULTS (test copy) ──
+const resLabel=r=>r==="void"?"\u{1F47B} VOID":String(r).toUpperCase();
 function gradePick(pick,hs,as){
   const t=String(pick||"").trim(), tot=hs+as; let m;
   if((m=t.match(/^Over ([0-9.]+)\s*\+\s*Over ([0-9.]+)\s*\+\s*BTTS$/i)))return (tot>+m[1]&&tot>+m[2]&&hs>0&&as>0)?"win":"loss";
@@ -999,15 +1045,15 @@ function gradePick(pick,hs,as){
   if(/^Home Win \(1X2\)/i.test(t))return hs>as?"win":"loss";
   if(/^Away Win \(1X2\)/i.test(t))return as>hs?"win":"loss";
   if(/^Draw \(1X2\)/i.test(t))return hs===as?"win":"loss";
-  if(/^DNB Home/i.test(t)){if(hs===as)return null;return hs>as?"win":"loss";}
-  if(/^DNB Away/i.test(t)){if(hs===as)return null;return as>hs?"win":"loss";}
+  if(/^DNB Home/i.test(t)){if(hs===as)return "void";return hs>as?"win":"loss";}
+  if(/^DNB Away/i.test(t)){if(hs===as)return "void";return as>hs?"win":"loss";}
   if((m=t.match(/(Home|Away) Team Over ([0-9.]+)/i))){const g=/^home/i.test(m[1])?hs:as;return g>+m[2]?"win":"loss";}
   return null; // anything not clearly gradable stays pending
 }
 async function checkResults(){
   const msg=document.getElementById("resMsg"); const btn=document.getElementById("resBtn");
   btn.disabled=true; msg.textContent="Checking results...";
-  let log=loadLog(), graded=0, notDone=0, notFound=0, skipped=0, seen={};
+  let log=loadLog(), voided=0, graded=0, notDone=0, notFound=0, skipped=0, seen={};
   try{
     for(const e of log){
       if(!e.homeTeam||!e.awayTeam||!e.picks||!e.picks.some(p=>p.result==="pending"))continue;
@@ -1023,11 +1069,11 @@ async function checkResults(){
         if(p.result!=="pending")return p;
         const g=gradePick(p.pick,R.hs,R.as);
         if(!g){skipped++;return p;}
-        graded++; return {...p,result:g,auto:true,finalScore:R.hs+"-"+R.as};
+        graded++; if(g==="void")voided++; return {...p,result:g,auto:true,finalScore:R.hs+"-"+R.as};
       });
     }
     saveLog(log); renderLog();
-    msg.textContent="Graded "+graded+" pick(s). Not finished yet: "+notDone+" match(es). Not found on mutating: "+notFound+". Left for you to mark: "+skipped+".";
+    msg.textContent="Graded "+graded+" pick(s)"+(voided?" ("+voided+" draw-no-bet draws voided)":"")+". Not finished yet: "+notDone+" match(es). Not found on mutating: "+notFound+". Left for you to mark: "+skipped+".";
   }catch(x){msg.textContent="Check failed: "+x.message;}
   finally{btn.disabled=false;}
 }
@@ -1057,8 +1103,8 @@ function runAnalysis(){
   });
   clearInterval(iv);thinking.style.display="none";
   let log=loadLog();
-  for(const{result}of outcomes){
-    const entry={id:Date.now()+Math.floor(Math.random()*1000),date:new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}),match:result.match,homeTeam:result.homeTeam,awayTeam:result.awayTeam,expectedGoals:result.expectedGoals,expectedGoals5:result.expectedGoals5,expectedGoals15:result.expectedGoals15,mode:"engine",muUrl:((__formByMatch[__fk(result.homeTeam,result.awayTeam)]||{}).url)||null};
+  for(const{result,odds:__od}of outcomes){
+    const entry={id:Date.now()+Math.floor(Math.random()*1000),date:new Date().toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}),match:result.match,homeTeam:result.homeTeam,awayTeam:result.awayTeam,expectedGoals:result.expectedGoals,expectedGoals5:result.expectedGoals5,expectedGoals15:result.expectedGoals15,mode:"engine",muUrl:((__formByMatch[__fk(result.homeTeam,result.awayTeam)]||{}).url)||null,...__csFields(result,__od)};
     if(result.picks&&result.picks.length>0){
       log=[{...entry,picks:result.picks.map(p=>({pick:p.market||p.pick,odds:p.odds,score:p.score,confidence:p.confidence,edge:p.edge,trackRate:p.trackRate!=null?p.trackRate:null,trackN:p.trackN!=null?p.trackN:null,result:"pending"}))},...log];
     }else{
@@ -1128,6 +1174,9 @@ function alignment(result,odds){
   const xgOk=M.engineXG==null||Math.abs(M.engineXG-M.tot)<=0.8;
   const aligned=allStrong&&fit.length>0&&top.i===pick.i&&top.j===pick.j&&xgOk;
   return{M:M,rows:rows,usable:usable,top:top,show:pick,aligned:aligned,constrained:fit.length>0,joint:Math.round(100*joint),conflict:usable.length>0&&!fit.length,agree:usable.filter(function(r){return r.model>=60;}).length,weak:usable.filter(function(r){return r.model<50;})};
+}
+function __csFields(result,odds){ // saved with each log entry: predicted score + alignment
+  try{const A=alignment(result,odds);if(!A)return{};return{cs:A.show.i+"-"+A.show.j,csPct:Math.round(100*A.show.q),aligned:!!A.aligned,agree:A.agree+"/"+A.usable.length};}catch(e){return{};}
 }
 function correctScore(result,odds){ // kept for older callers
   const A=alignment(result,odds);
@@ -1261,7 +1310,7 @@ function calibrate(log){
     const homeT=entry.homeTeam||(entry.match?entry.match.split(" vs ")[0]:"")||"";
     const awayT=entry.awayTeam||(entry.match?entry.match.split(" vs ")[1]:"")||"";
     for(const pick of picks){
-      if(pick.result==="pending")continue;
+      if(pick.result!=="win"&&pick.result!=="loss")continue;
       const won=pick.result==="win";
       const score=Math.round(parseFloat(pick.score)||0);
       const mt=getMarketType(pick.pick);
@@ -1309,10 +1358,10 @@ function parseImportedResults(raw){
     const picks=[];
     for(let i=startIdx;i<lines.length;i++){
       // "Pick text @ odds | score/10 | WIN/LOSS/PENDING"
-      const pm=lines[i].match(/^(.+?)\s*@\s*([0-9]+\.?[0-9]*)\s*\|\s*([0-9]+\.?[0-9]*)\s*(?:\/\s*10)?\s*\|\s*(win|w|loss|l|pending)\b/i);
+      const pm=lines[i].match(/^(.+?)\s*@\s*([0-9]+\.?[0-9]*)\s*\|\s*([0-9]+\.?[0-9]*)\s*(?:\/\s*10)?\s*\|\s*(win|w|loss|l|pending|void)\b/i);
       if(!pm)continue;
       const resRaw=pm[4].toLowerCase();
-      const result=resRaw.startsWith("w")?"win":resRaw.startsWith("l")?"loss":"pending";
+      const result=resRaw.startsWith("w")?"win":resRaw.startsWith("l")?"loss":resRaw==="void"?"void":"pending";
       const score=+parseFloat(pm[3]).toFixed(1);
       picks.push({pick:pm[1].trim(),odds:+parseFloat(pm[2]).toFixed(2),score,confidence:score>=9?"High":score>=8?"Medium":"Low",result});
     }
@@ -1360,7 +1409,7 @@ let noPickBoxOpen=false;
 function toggleNoPickBox(){noPickBoxOpen=!noPickBoxOpen;renderLog();}
 let over25BoxOpen=false;
 function toggleOver25Box(){over25BoxOpen=!over25BoxOpen;renderLog();}
-function renderLog(){
+function renderLog(){setTimeout(backupReminder,0);
   const rawLog=loadLog();
   // Favorited matches float to the top; otherwise keep the existing (newest-first) order.
   const fullLog=[...rawLog].sort((a,b)=>(b.favorite?1:0)-(a.favorite?1:0));
@@ -1436,7 +1485,7 @@ function renderLog(){
                   "<span style=\"font-family:Courier New,monospace;font-size:12px;font-weight:700;color:var(--silver)\">"+p.odds+"</span>"+
                   "<span style=\"font-family:Courier New,monospace;font-size:11px;color:var(--muted)\">"+p.score+"/10</span>"+
                   "</div></div>"+
-                  "<div style=\"font-size:11px;font-weight:700;color:"+resColor+";flex-shrink:0\">"+p.result.toUpperCase()+"</div>"+
+                  "<div style=\"font-size:11px;font-weight:700;color:"+resColor+";flex-shrink:0\">"+resLabel(p.result)+"</div>"+
                   "</div>";
               }).join("")+
               "</div></div>";
@@ -1502,7 +1551,7 @@ function renderLog(){
         const awayT=entry.awayTeam||(entry.match?entry.match.split(" vs ")[1]:"")||"";
         const o25=entry.picks.find(p=>getMarketType(p.pick)==="Over 2.5");
         const resColor=o25.result==="win"?"#16a34a":o25.result==="loss"?"#dc2626":"#9090a8";
-        const resTag=o25.result==="pending"?"<span style=\"color:var(--dim)\">&#x23F3;</span>":"<span style=\"color:"+resColor+";font-weight:700\">"+o25.result.toUpperCase()+"</span>";
+        const resTag=o25.result==="pending"?"<span style=\"color:var(--dim)\">&#x23F3;</span>":"<span style=\"color:"+resColor+";font-weight:700\">"+resLabel(o25.result)+"</span>";
         return "<div style=\"display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 0;border-top:1px solid var(--s3)\">"+
           "<div style=\"min-width:0\"><div style=\"font-size:12.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap\">"+homeT+" <span style=\"color:var(--dim);font-weight:500\">vs</span> "+awayT+"</div>"+
           "<div style=\"font-size:11px;color:var(--dim);margin-top:1px;font-family:Courier New,monospace\">@ "+o25.odds+" &middot; "+o25.score+"/10 &middot; "+resTag+"</div></div>"+
@@ -1521,6 +1570,8 @@ function renderLog(){
       const goalsTagText=(entry.expectedGoals5!=null&&entry.expectedGoals15!=null)
         ? "L5: "+entry.expectedGoals5+" &middot; L15: "+entry.expectedGoals15+" xG"
         : entry.expectedGoals!=null?entry.expectedGoals+" xG":null;
+      const __act=(picks.find(p=>p.finalScore)||{}).finalScore;
+      const csTag=entry.cs?"<span style=\"font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(37,99,235,0.08);color:#2563eb;border:1px solid rgba(37,99,235,0.25);margin-left:6px\">&#x1F3AF; "+entry.cs+" ("+entry.csPct+"%)"+(__act?" &middot; actual "+__act:"")+"</span>"+(entry.aligned?"<span style=\"font-size:10px;font-weight:800;padding:2px 7px;border-radius:999px;background:#16a34a;color:#fff;margin-left:6px\">&#x2705; ALIGNED</span>":""):"";
       const goalsTag=goalsTagText?"<span style=\"font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(217,119,6,0.1);color:var(--amber);border:1px solid rgba(217,119,6,0.25);margin-left:6px\">&#x26BD; "+goalsTagText+"</span>":"";
       // GOALS LOCK — same rule as the Analyse tab: Over 1.5 (score>=9) AND Over 2.5
       // (score>=8) both present in the SAME match. Tags only those two picks, not
@@ -1540,7 +1591,7 @@ function renderLog(){
       const VERIFIED_RATE_MIN=85,VERIFIED_N_MIN=10;
       const isVerifiedPick=p=>(parseFloat(p.score)||0)>=9.95&&p.trackRate!=null&&p.trackN!=null&&p.trackRate>=VERIFIED_RATE_MIN&&p.trackN>=VERIFIED_N_MIN;
       return "<div class=\"log-entry\">"+
-        "<div class=\"log-head\"><div><div style=\"font-size:11px;color:#9090a8;margin-bottom:2px\">"+entry.date+" "+modeTagHTML()+goalsTag+"</div>"+
+        "<div class=\"log-head\"><div><div style=\"font-size:11px;color:#9090a8;margin-bottom:2px\">"+entry.date+" "+modeTagHTML()+goalsTag+csTag+"</div>"+
         "<div style=\"font-size:13px;font-weight:700;color:var(--ink);margin-bottom:2px\"><span>"+homeT+"</span><span style=\"color:var(--dim);font-weight:500\"> vs </span><span>"+awayT+"</span></div>"+
         "<div style=\"font-size:12px;font-weight:600;color:var(--muted)\">"+picks.length+" pick"+(picks.length!==1?"s":"")+"</div></div><div style=\"display:flex;align-items:center;gap:2px\"><button class=\"del-btn\" style=\""+(entry.favorite?"color:#d4a017":"")+"\" onclick=\"toggleFavorite("+entry.id+")\" >"+(entry.favorite?"&#x2605;":"&#x2606;")+"</button><button class=\"del-btn\" onclick=\"delEntry("+entry.id+")\" >&#x1F5D1;</button></div></div>"+
         "<div class=\"log-picks\">"+picks.map((p,pi)=>{
@@ -1577,8 +1628,8 @@ function renderLog(){
             "<div style=\"font-size:12px;color:var(--muted);margin-top:1px\">"+selection+"</div>"+
             "</div>"+
             "<div style=\"display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0\">"+
-            "<div class=\"res-btns\"><button class=\"res-btn "+(p.result==="win"?"win":"")+"\" onclick=\"setRes("+entry.id+","+pi+",'win')\">&#x2713; W</button><button class=\"res-btn "+(p.result==="loss"?"loss":"")+"\" onclick=\"setRes("+entry.id+","+pi+",'loss')\">&#x2715; L</button></div>"+
-            (p.result==="pending"?"<div class=\"pending-tag\">&#x23F3;</div>":"<div style=\"font-size:11px;font-weight:700;color:"+resColor+"\">"+p.result.toUpperCase()+"</div>")+
+            "<div class=\"res-btns\"><button class=\"res-btn "+(p.result==="win"?"win":"")+"\" onclick=\"setRes("+entry.id+","+pi+",'win')\">&#x2713; W</button><button class=\"res-btn "+(p.result==="loss"?"loss":"")+"\" onclick=\"setRes("+entry.id+","+pi+",'loss')\">&#x2715; L</button><button class=\"res-btn "+(p.result==="void"?"loss":"")+"\" onclick=\"setRes("+entry.id+","+pi+",'void')\">V</button></div>"+
+            (p.result==="pending"?"<div class=\"pending-tag\">&#x23F3;</div>":"<div style=\"font-size:11px;font-weight:700;color:"+resColor+"\">"+resLabel(p.result)+"</div>")+
             "</div></div>";
         }).join("")+
         "</div></div>";
