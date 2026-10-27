@@ -41,7 +41,7 @@ const STOP = new Set([
   "the", "de", "la", "el", "club", "calcio", "cp", "fsv", "tsv", "vfb", "vfl", "sv", "bk", "if", "ik",
 ]);
 const GENERIC = new Set(["city", "united", "town", "rovers", "athletic", "real", "sporting", "dynamo", "dinamo", "juniors", "academy", "county", "wanderers", "albion", "rangers", "olympic", "olympique", "sparta", "central", "north", "south", "east", "west", "saint", "santa", "deportivo", "deportes", "atletico", "racing", "inter", "internacional", "sport", "stadium", "utd"]);
-const ALIAS = { wolves: "wolverhampton", spurs: "tottenham", utd: "united", man: "manchester", psg: "paris", gladbach: "monchengladbach", st: "saint" };
+const ALIAS = { wolves: "wolverhampton", spurs: "tottenham", utd: "united", man: "manchester", psg: "paris", gladbach: "monchengladbach", st: "saint", cologne: "koln", praha: "prague", prag: "prague", brondby: "broendby", munchen: "munich", koeln: "koln" };
 const MARK = /^(women|w|u\d{2}|ii|iii|b|res|reserves|youth)$/;
 function parts(name) {
   const raw = String(name || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" ").filter(Boolean).map((t) => ALIAS[t] || t);
@@ -62,6 +62,9 @@ const wt = (t) => (GENERIC.has(t) ? 0.35 : 1);
 // 1 = same team, 0 = different. A short name that sits inside a longer one still scores high ("Rudes" in "NK Rudes Zagreb").
 function nameScore(a, b) {
   const A = parts(a), B = parts(b);
+  // acronym ("UCD" = University College Dublin)
+  const acr = (x, y) => x.core.length === 1 && /^[a-z]{2,4}$/.test(x.core[0]) && y.core.length >= 2 && y.core.map((t) => t[0]).join("") === x.core[0];
+  if (A.marks === B.marks && (acr(A, B) || acr(B, A))) return 0.9;
   if (!A.core.length || !B.core.length || A.marks !== B.marks) return 0;
   const sum = (arr) => arr.reduce((s, t) => s + wt(t), 0);
   const matched = A.core.filter((x) => B.core.some((y) => tokMatch(x, y))).reduce((s, t) => s + wt(t), 0);
@@ -116,7 +119,15 @@ async function findMatch(home, away, diag) {
     .sort((a, b) => b.total - a.total);
   const best = scored[0];
   diag.candidates = scored.slice(0, 3).filter((c) => c.total >= 0.5).map((c) => ({ url: c.url, sh: +c.sh.toFixed(2), sa: +c.sa.toFixed(2) }));
-  if (!best || best.sh < 0.75 || best.sa < 0.75) return null;
+  if (!best || best.sh < 0.75 || best.sa < 0.75) {
+    // closest-match fallback: both teams partly agree, nothing else comes close
+    if (best && best.sh >= 0.4 && best.sa >= 0.4 && best.total >= 0.9) {
+      const sec = scored[1];
+      if (!(sec && sec.url !== best.url && sec.total >= best.total - 0.15)) { diag.fuzzy = true; return best; }
+      diag.ambiguous = true;
+    }
+    return null;
+  }
   const second = scored[1];
   if (second && second.total >= best.total - 0.15 && second.url !== best.url) {
     diag.ambiguous = true;
@@ -306,6 +317,7 @@ export default async (req) => {
     if (Object.keys(info.last).length < 2) return json({ ok: false, reason: "no_last_matches", diag });
 
     const notes = [];
+    if (diag.fuzzy) notes.push("Closest match used: " + info.home + " v " + info.away + " (names differ slightly from betPawa).");
     let w5 = null, w15 = null, approx = false;
     if (info.staticId) {
       const [a, b] = await Promise.all([postWindow(found.url, info.staticId, 5).catch((e) => ({ error: String(e && e.message || e) })), postWindow(found.url, info.staticId, 15).catch((e) => ({ error: String(e && e.message || e) }))]);

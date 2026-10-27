@@ -14,7 +14,7 @@ const STOP = new Set([
   "the", "de", "la", "el", "club", "calcio", "cp", "fsv", "tsv", "vfb", "vfl", "sv", "bk", "if", "ik",
 ]);
 const GENERIC = new Set(["city", "united", "town", "rovers", "athletic", "real", "sporting", "dynamo", "dinamo", "juniors", "academy", "county", "wanderers", "albion", "rangers", "olympic", "olympique", "sparta", "central", "north", "south", "east", "west", "saint", "santa", "deportivo", "deportes", "atletico", "racing", "inter", "internacional", "sport", "stadium", "utd"]);
-const ALIAS = { wolves: "wolverhampton", spurs: "tottenham", utd: "united", man: "manchester", psg: "paris", gladbach: "monchengladbach", st: "saint" };
+const ALIAS = { wolves: "wolverhampton", spurs: "tottenham", utd: "united", man: "manchester", psg: "paris", gladbach: "monchengladbach", st: "saint", cologne: "koln", praha: "prague", prag: "prague", brondby: "broendby", munchen: "munich", koeln: "koln" };
 const MARK = /^(women|w|u\d{2}|ii|iii|b|res|reserves|youth)$/;
 function parts(name) {
   const raw = String(name || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" ").filter(Boolean).map((t) => ALIAS[t] || t);
@@ -22,11 +22,22 @@ function parts(name) {
   const core = raw.filter((t) => !MARK.test(t) && t.length > 1 && !STOP.has(t) && !/^\d{4}$/.test(t));
   return { marks, core };
 }
-const tokMatch = (a, b) => a === b || (a.length >= 3 && b.length >= 3 && (a.startsWith(b) || b.startsWith(a)));
+function lev(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+// spelling variants (Qadsiah / Qadisiyah): allow 1 typo on 5-6 letter words, 2 on 7+ letters
+const near = (a, b) => { const m = Math.min(a.length, b.length); return m >= 5 && lev(a, b) <= (m >= 7 ? 2 : 1); };
+const tokMatch = (a, b) => a === b || (a.length >= 3 && b.length >= 3 && (a.startsWith(b) || b.startsWith(a))) || near(a, b);
 const wt = (t) => (GENERIC.has(t) ? 0.35 : 1);
 // 1 = same team, 0 = different. A short name that sits inside a longer one still scores high ("Rudes" in "NK Rudes Zagreb").
 function nameScore(a, b) {
   const A = parts(a), B = parts(b);
+  // acronym ("UCD" = University College Dublin)
+  const acr = (x, y) => x.core.length === 1 && /^[a-z]{2,4}$/.test(x.core[0]) && y.core.length >= 2 && y.core.map((t) => t[0]).join("") === x.core[0];
+  if (A.marks === B.marks && (acr(A, B) || acr(B, A))) return 0.9;
   if (!A.core.length || !B.core.length || A.marks !== B.marks) return 0;
   const sum = (arr) => arr.reduce((s, t) => s + wt(t), 0);
   const matched = A.core.filter((x) => B.core.some((y) => tokMatch(x, y))).reduce((s, t) => s + wt(t), 0);
@@ -70,7 +81,10 @@ export default async (req) => {
       const sc = rows.map((c) => ({ ...c, sh: nameScore(home, c.home), sa: nameScore(away, c.away) })).sort((a, b) => b.sh + b.sa - (a.sh + a.sa));
       const best = sc[0];
       diag.best = best && { url: best.url, sh: +best.sh.toFixed(2), sa: +best.sa.toFixed(2) };
-      if (!best || best.sh < 0.75 || best.sa < 0.75) return json({ ok: false, reason: "match_not_found", diag });
+      const strict = best && best.sh >= 0.75 && best.sa >= 0.75;
+      const sec = sc[1];
+      const fuzzy = !strict && best && best.sh >= 0.4 && best.sa >= 0.4 && best.sh + best.sa >= 0.9 && !(sec && sec.sh + sec.sa >= best.sh + best.sa - 0.15);
+      if (!strict && !fuzzy) return json({ ok: false, reason: "match_not_found", diag });
       matchUrl = best.url;
     }
     const code = (matchUrl.match(/prediction-([a-z0-9]+)\/?$/i) || [])[1];
