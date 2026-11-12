@@ -144,7 +144,7 @@ textarea:focus{outline:none;border-color:var(--silver3);}
 <div id="analyseTab" class="zone">
 <div id="slipWrap" style="margin-bottom:12px">
     <div style="display:flex;gap:8px;margin-bottom:6px"><button class="btn-sm" id="dayToday" type="button" onclick="setSlipDay('today')">Today</button><button class="btn-sm" id="dayTomorrow" type="button" onclick="setSlipDay('tomorrow')">Tomorrow</button></div><div id="slipDayNote" style="font-size:11.5px;color:var(--dim);margin-bottom:8px"></div>
-    <button class="run-btn" type="button" onclick="buildSlips()" style="background:linear-gradient(135deg,#0d9488,#7c3aed);margin-bottom:8px">&#x1F3AF; Build slips (Full Time, Over 1.5, My bets, Safest &middot; 2.20&ndash;2.50)</button>
+    <button class="run-btn" type="button" onclick="buildSlips()" style="background:linear-gradient(135deg,#0d9488,#7c3aed);margin-bottom:8px">&#x1F3AF; Build V2 slips (Full Time, Over 1.5, Safest &middot; 2.20&ndash;2.50)</button>
     <div id="slipOut"></div>
   </div>
   <div id="inputSection">
@@ -2063,6 +2063,7 @@ function toggleNoPickBox(){noPickBoxOpen=!noPickBoxOpen;renderLog();}
 let over25BoxOpen=false;
 function toggleOver25Box(){over25BoxOpen=!over25BoxOpen;renderLog();}
 let __logShow=200;window.__pmFns={};   // the Log list shows the newest 200 first so a big log stays fast on a phone
+function __toggleCard(id,h){window.__openCards=window.__openCards||{};const b=h.parentNode.querySelector('.log-picks');if(!b)return;const open=b.style.display==='none';b.style.display=open?'block':'none';window.__openCards[id]=open;}
 function renderLog(){window.__pmFns={};setTimeout(backupReminder,0);setTimeout(renderSlipTracker,0);setTimeout(renderTrash,0);setTimeout(renderScoreboard,0);
   const rawLog=loadLog();
   // Favorited matches float to the top; then NEWEST DATE FIRST, and within a day the most recently analysed first.
@@ -2280,11 +2281,18 @@ function renderLog(){window.__pmFns={};setTimeout(backupReminder,0);setTimeout(r
       // trackRate/trackN and simply won't qualify — that's expected, not a bug.
       const VERIFIED_RATE_MIN=85,VERIFIED_N_MIN=10;
       const isVerifiedPick=p=>(parseFloat(p.score)||0)>=9.95&&p.trackRate!=null&&p.trackN!=null&&p.trackRate>=VERIFIED_RATE_MIN&&p.trackN>=VERIFIED_N_MIN;
+      // v1 cards are collapsed by default; they open fully only when a v1 pick is also a V2 pick (same market). Tap the header to open/close any card.
+      const __nk=t=>String(t||"").split("\u2014").pop().trim().toLowerCase();
+      const __v2k=((entry.v2&&entry.v2.c)||[]).filter(c=>c.k).map(c=>__nk(c.n));
+      const __agree=picks.some(p=>__v2k.indexOf(__nk(p.pick))>=0);
+      window.__openCards=window.__openCards||{};
+      const __open=(entry.id in window.__openCards)?window.__openCards[entry.id]:__agree;
+      const __agTag=__agree?"<span style=\"font-size:10px;font-weight:800;padding:2px 7px;border-radius:999px;background:rgba(124,58,237,0.12);color:#7c3aed;border:1px solid rgba(124,58,237,0.35);margin-left:6px\">&#x2714; v2 agrees</span>":"";
       return "<div class=\"log-entry\">"+
-        "<div class=\"log-head\"><div><div style=\"font-size:11px;color:#9090a8;margin-bottom:2px\">"+entry.date+" "+modeTagHTML()+goalsTag+csTag+wTag+"</div>"+
+        "<div class=\"log-head\" style=\"cursor:pointer\" onclick=\"if(!event.target.closest('button'))__toggleCard("+entry.id+",this)\"><div><div style=\"font-size:11px;color:#9090a8;margin-bottom:2px\">"+entry.date+" "+modeTagHTML()+goalsTag+csTag+wTag+__agTag+"</div>"+
         "<div style=\"font-size:13px;font-weight:700;color:var(--ink);margin-bottom:2px\"><span>"+homeT+"</span><span style=\"color:var(--dim);font-weight:500\"> vs </span><span>"+awayT+"</span></div>"+
         "<div style=\"font-size:12px;font-weight:600;color:var(--muted)\">"+picks.length+" pick"+(picks.length!==1?"s":"")+"</div></div><div style=\"display:flex;align-items:center;gap:2px\"><button class=\"del-btn\" style=\""+(entry.favorite?"color:#d4a017":"")+"\" onclick=\"toggleFavorite("+entry.id+")\" >"+(entry.favorite?"&#x2605;":"&#x2606;")+"</button><button class=\"del-btn\" onclick=\"delEntry("+entry.id+")\" >&#x1F5D1;</button></div></div>"+
-        "<div class=\"log-picks\">"+picks.map((p,pi)=>{
+        "<div class=\"log-picks\" style=\"display:"+(__open?"block":"none")+"\">"+picks.map((p,pi)=>{
           const mt=getMarketType(p.pick);
           const isTeamGoals=mt==="Home Goals"||mt==="Away Goals";
           const parts=(p.pick||"").split("—");
@@ -2321,7 +2329,7 @@ function renderLog(){window.__pmFns={};setTimeout(backupReminder,0);setTimeout(r
             (p.result==="pending"?"<div class=\"pending-tag\">&#x23F3;</div>":"<div style=\"font-size:11px;font-weight:700;color:"+resColor+"\">"+resLabel(p.result)+"</div>")+
             "</div></div>";
         }).join("")+
-        "</div></div>";
+        "</div>"+(function(){try{return V2.cardHTML(entry);}catch(x){return "";}})()+"</div>";
     }).join("");
     if(shownLog.length>__logShow)html+="<button class='btn-sm' style='width:100%;padding:12px;margin:8px 0' onclick='__logShow+=200;renderLog()'>Show 200 more ("+(shownLog.length-__logShow)+" older matches hidden)</button>";}
   document.getElementById("logContent").innerHTML=statsHTML+html;
@@ -2565,8 +2573,15 @@ function toStore(r){
   const pickSet=new Set(r.picks);
   const rows=[];const seen=new Set();
   for(const c of r.picks.concat(r.pool)){if(seen.has(c))continue;seen.add(c);rows.push(c);}
+  // also keep the best ticket-eligible markets (full time, Over 1.5, highest chance) so V2 slips can be rebuilt later from the log
+  for(const tk of Object.keys(TYPES)){
+    const T=TYPES[tk];
+    const q=r.all.filter(x=>x.o>=CFG.minOdds&&x.p>=T.minP&&x.ev>=T.minEV&&T.ok(x)).sort((a,b)=>b.p-a.p).slice(0,4);
+    for(const c of q){if(seen.has(c))continue;seen.add(c);rows.push(c);}
+  }
   return{v:VER,m:r.eg.mode,lh:+r.eg.lamH.toFixed(2),la:+r.eg.lamA.toFixed(2),lm:r.eg.lamMkt?+r.eg.lamMkt.toFixed(2):null,lr:r.lowRel?1:0,
-    c:rows.map(c=>({n:c.n,o:c.o,p:+c.p.toFixed(3),e:+c.ev.toFixed(3),t:c.t||null,k:pickSet.has(c)?1:0,s:c.s,r:'pending'}))};
+    c:rows.map(c=>({n:c.n,o:c.o,p:+c.p.toFixed(3),e:+c.ev.toFixed(3),t:c.t||null,k:pickSet.has(c)?1:0,s:c.s,r:'pending'})),
+    a:r.all.filter(c=>c.o>=CFG.minOdds).sort((x,y)=>y.p-x.p).map(c=>({n:c.n,o:c.o,p:+c.p.toFixed(3),e:+c.ev.toFixed(3),s:c.s}))};
 }
 function gradeEntry(e,hs,as){
   if(!e||!e.v2||!e.v2.c)return 0;let n=0;
@@ -2677,7 +2692,12 @@ function searchTicket(items,T,perMatch){
 }
 function buildTickets(items){
   const mk=(b,tier)=>b?{tier:tier,label:TYPES[tier].label,odds:b.odds,p:b.p,ev:b.p*b.odds-1,legs:b.legs.map(l=>({h:l.m.home,a:l.m.away,n:l.c.n,o:l.c.o,p:l.c.p,s:l.c.s}))}:null;
-  return{diamond:mk(searchTicket(items,TYPES.Diamond),'Diamond'),silver:mk(searchTicket(items,TYPES.Silver),'Silver'),safest:mk(searchTicket(items,TYPES.Safest),'Safest')};
+  let left=items;const res={};
+  for(const [key,tier] of [['diamond','Diamond'],['silver','Silver'],['safest','Safest']]){
+    const b=searchTicket(left,TYPES[tier]);res[key]=mk(b,tier);
+    if(b){const used=new Set(b.legs.map(l=>l.m.home+'|'+l.m.away));left=left.filter(it=>!used.has(it.home+'|'+it.away));}
+  }
+  return res;
 }
 const TK_COL={Diamond:'#0891b2',Silver:'#6b7280',Safest:'#16a34a'};
 let lastTickets=[];
@@ -2704,7 +2724,6 @@ function ticketsPanel(list){
   };
   h+=card(T.diamond,'Diamond');h+=card(T.silver,'Silver');h+=card(T.safest,'Safest');
   h+="<div style='font-size:11px;color:var(--dim);border-top:1px solid var(--bd);padding-top:6px'>No ticket is guaranteed to hit. Safest is only the most likely combination on this slate, and its chance is shown. Chances multiply across legs and each extra leg also multiplies the bookmaker margin, so expected return is usually negative. Small stakes only.</div></div>";
-  if(lastTickets.length)saveTicketRecord(T);
   return h;
 }
 // ---- Ticket tracker (mirrors the v1 slip tracker: one record per day, graded from the log, 1,000 flat stake) ----
@@ -2728,7 +2747,7 @@ function loadRecords(){
 function saveRecords(a){try{localStorage.setItem('oo_v2_tickets',JSON.stringify(a.slice(0,400)));}catch(e){}}
 const legsOf=t=>t?t.legs.map(l=>({m:l.h+' vs '+l.a,h:l.h,a:l.a,n:l.n,o:l.o,s:l.s})):[];
 function legInfo(date,leg,log){
-  const e=log.find(x=>x.date===date&&x.homeTeam===leg.h&&x.awayTeam===leg.a);
+  const e=log.find(x=>(x.date===date||x.kickoffDate===date)&&x.homeTeam===leg.h&&x.awayTeam===leg.a);
   if(!e)return{r:'pending'};
   const fs=e.finalScore||((e.picks||[]).find(q=>q.finalScore)||{}).finalScore||null;
   const m=fs?String(fs).match(/^(\d+)-(\d+)$/):null;
@@ -2743,9 +2762,9 @@ function ticketStatus(date,legs,log){
   if(r.every(x=>x==='win'||x==='void')&&r.some(x=>x==='win'))return 'win';
   return 'pending';
 }
-function saveTicketRecord(T){
+function saveTicketRecord(T,day){
   try{
-    const date=todayStr(),log=(typeof loadLog==='function')?loadLog():[];
+    const date=day||todayStr(),log=(typeof loadLog==='function')?loadLog():[];
     const rec={date:date,ts:Date.now(),diamond:legsOf(T.diamond),silver:legsOf(T.silver),safest:legsOf(T.safest)};
     if(!rec.diamond.length&&!rec.silver.length&&!rec.safest.length)return;
     const settled=r=>TK_KEYS.some(k=>(r[k]||[]).some(l=>legInfo(r.date,l,log).r!=='pending'));
@@ -2760,6 +2779,60 @@ function restoreTickets(arr){
   const have=loadRecords(),sigs=new Set(have.map(recSig));
   for(const r of arr){if(r&&r.date!==undefined&&!sigs.has(recSig(r))){have.push(r);sigs.add(recSig(r));}}
   saveRecords(have);
+}
+// ---- V2 slips in the slip generator: built from the log (same matches, same Today/Tomorrow window), saved to the V2 tracker ----
+function cardHTML(e){
+  const v=e&&e.v2;if(!v||!v.c)return '';
+  const fs=e.finalScore||((e.picks||[]).find(q=>q.finalScore)||{}).finalScore||null;
+  const m=fs?String(fs).match(/^(\d+)-(\d+)$/):null;
+  const res=(s,stored)=>{if(stored&&stored!=='pending')return stored;if(!m||!s)return 'pending';const o=outcome(s,+m[1],+m[2]);return o>0?'win':(o===0?'void':'loss');};
+  const mark=r=>r==='win'?"<b style='color:#16a34a'>W</b>":r==='loss'?"<b style='color:#dc2626'>L</b>":r==='void'?"<b style='color:#9090a8'>VOID</b>":"<span style='color:#9090a8'>&#x23F3;</span>";
+  const tint=r=>r==='win'?'background:rgba(22,163,74,0.14);border-left:3px solid #16a34a;padding-left:6px;':r==='loss'?'background:rgba(220,38,38,0.12);border-left:3px solid #dc2626;padding-left:6px;':'';
+  let h="<div style='font-size:11.5px;color:var(--dim);margin-bottom:6px'>Expected goals "+v.lh.toFixed(2)+" - "+v.la.toFixed(2)+" ("+(v.lh+v.la).toFixed(2)+" total) &middot; basis: "+esc(v.m)+(v.lm?" &middot; market total "+v.lm.toFixed(2):"")+(v.lr?" &middot; <span style='color:#b45309'>lower reliability</span>":"")+(fs?" &middot; final "+esc(fs):"")+"</div>";
+  const picks=v.c.filter(c=>c.k);
+  if(!picks.length)h+="<div style='font-size:12.5px;font-weight:800;padding:6px 0;border-top:1px solid var(--bd)'>NO PICK <span style='font-weight:500;color:var(--dim)'>(nothing both likely and fairly priced)</span></div>";
+  for(const c of picks){const t=c.t||'CLOSEST';
+    const rr=res(c.s,c.r);h+="<div style='display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--bd);"+tint(rr)+"'><div><span style='font-size:10px;font-weight:800;color:#fff;background:"+TIER_COL[t]+";border-radius:6px;padding:2px 6px'>"+TIER_LABEL[t]+"</span> <b style='font-size:12.5px'>"+esc(c.n)+"</b><div style='font-size:11px;color:var(--dim)'>chance "+pc(c.p)+" &middot; return "+sg(c.e)+"</div></div><div style='text-align:right'><b>@"+c.o.toFixed(2)+"</b><div>"+mark(res(c.s,c.r))+"</div></div></div>";}
+  const all=v.a||v.c;
+  h+="<div onclick=\"var b=this.nextSibling;b.style.display=b.style.display==='none'?'block':'none'\" style='font-size:12px;font-weight:700;cursor:pointer;margin-top:6px'>&#x25BE; Scan all "+all.length+" markets"+(v.a?"":" (older entry: stored picks only)")+"</div><div style='display:none;font-size:11.5px;margin-top:4px;line-height:1.7'>";
+  for(const c of all)h+="<div style='display:flex;justify-content:space-between;"+(m?tint(res(c.s,c.r)):'')+"'><span>"+esc(c.n)+"</span><span>"+pc(c.p)+" &middot; @"+c.o.toFixed(2)+" &middot; "+sg(c.e)+" "+(m?mark(res(c.s,c.r)):'')+"</span></div>";
+  h+="</div>";
+  const pr=picks.map(c=>res(c.s,c.r));const hs=pr.indexOf('loss')>=0?'loss':(pr.length&&pr.every(x=>x==='win'||x==='void')&&pr.indexOf('win')>=0?'win':'');
+  return "<div style='border-top:1px solid var(--bd);padding:8px 12px;"+tint(hs).replace('padding-left:6px;','')+"'><div onclick=\"var b=this.nextSibling;b.style.display=b.style.display==='none'?'block':'none'\" style='font-size:12.5px;font-weight:800;cursor:pointer;color:#7c3aed'>&#x25BE; v2 analysis <span style='font-weight:600;color:var(--dim)'>(shadow, unvalidated)</span></div><div style='display:none;margin-top:6px'>"+h+"</div></div>";
+}
+let lastSlipTk=[];
+function slipPanel(day,entries){
+  const seen=new Set(),items=[];
+  for(const e of entries){
+    if(!e.v2||!e.v2.c||!e.homeTeam||!e.awayTeam)continue;
+    const k=e.homeTeam+'|'+e.awayTeam;if(seen.has(k))continue;seen.add(k);
+    items.push({home:e.homeTeam,away:e.awayTeam,run:{lowRel:!!e.v2.lr,all:e.v2.c.map(c=>({n:c.n,o:c.o,p:c.p,ev:c.e,s:c.s}))}});
+  }
+  let h="<div style='background:var(--s2);border:1.5px solid #7c3aed;border-radius:14px;padding:12px 14px;margin:14px 0 10px'><div style='font-size:13px;font-weight:800;margin-bottom:2px'>V2 slips <span style='font-weight:600;color:var(--dim)'>(its own picks, shadow, unvalidated)</span></div>";
+  if(items.length<2){return h+"<div style='font-size:12px;color:var(--dim)'>Not enough V2-analysed matches kicking off "+esc(day)+" yet.</div></div>";}
+  const T=buildTickets(items);
+  lastSlipTk=[T.diamond,T.silver,T.safest].filter(Boolean);
+  h+="<div style='font-size:11.5px;color:var(--dim);margin-bottom:6px'>Built from "+items.length+" matches by V2's own probabilities (not v1's picks). Full Time first, then Over 1.5, then Safest from what is left; no shared matches. Saved to the V2 tracker in the Log tab.</div>";
+  const names={Diamond:'V2 &middot; Full Time (1X2)',Silver:'V2 &middot; Over 1.5',Safest:'V2 &middot; Safest (all markets)'};
+  let idx=0;
+  const card=(t,tier)=>{
+    const D=TYPES[tier];
+    if(!t)return "<div style='border-top:1px solid var(--bd);padding:8px 0;font-size:12.5px'><b>"+names[tier]+"</b> (odds "+D.lo.toFixed(2)+"-"+D.hi.toFixed(2)+"): no slip. Not enough qualifying V2 picks on this slate.</div>";
+    idx++;
+    let c="<div style='border-top:1px solid var(--bd);padding:8px 0'><div style='display:flex;justify-content:space-between'><b style='font-size:13px'>"+names[tier]+"</b><b>@"+t.odds.toFixed(2)+"</b></div>";
+    for(const l of t.legs)c+="<div style='display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:3px 0'><span>"+esc(l.h)+" vs "+esc(l.a)+"<br><b>"+esc(l.n)+"</b></span><span style='white-space:nowrap'>@"+l.o.toFixed(2)+" &middot; "+pc(l.p)+"</span></div>";
+    return c+"<div style='font-size:11.5px;color:var(--dim)'>Estimated win chance "+pc(t.p)+" &middot; expected return "+sg(t.ev)+"</div></div>";
+  };
+  h+=card(T.diamond,'Diamond')+card(T.silver,'Silver')+card(T.safest,'Safest');
+  h+="<button class='btn-sm' style='width:100%;padding:10px;margin-top:4px' onclick='V2.copySlipTk()'>&#x1F4CB; Copy V2 slips</button><div id='v2SlipCopyMsg' style='font-size:12px;color:var(--dim)'></div></div>";
+  if(lastSlipTk.length){saveTicketRecord(T,day);try{renderTracker();}catch(e){}}
+  return h;
+}
+function copySlipTk(){
+  const nm=['V2 FULL TIME','V2 OVER 1.5','V2 SAFEST'];
+  const txt=lastSlipTk.map(t=>({Diamond:nm[0],Silver:nm[1],Safest:nm[2]}[t.tier])+' ('+t.odds.toFixed(2)+')\n'+t.legs.map(l=>'- '+l.h+' vs '+l.a+': '+l.n+' @ '+l.o.toFixed(2)).join('\n')).join('\n\n');
+  const m=document.getElementById('v2SlipCopyMsg');
+  try{navigator.clipboard.writeText(txt).then(()=>{if(m)m.textContent='Copied.';});}catch(e){const t=document.createElement('textarea');t.value=txt;document.body.appendChild(t);t.select();try{document.execCommand('copy');}catch(x){}t.remove();if(m)m.textContent='Copied.';}
 }
 let trackOpen=false;
 function toggleTrack(){trackOpen=!trackOpen;renderTracker();}
@@ -2796,7 +2869,7 @@ function attach(log,outcomes){
   }
 }
 return{VER:VER,CFG:CFG,core:{grid:grid,outcome:outcome,probs:probs,fitTotal:fitTotal,fitShare:fitShare,extract:extract,expectedGoals:expectedGoals,run:run,toStore:toStore,gradeEntry:gradeEntry,tierOf:tierOf,ticketStatus:ticketStatus,legInfo:legInfo},
-  cache:CACHE,buildTickets:buildTickets,itemsFrom:itemsFrom,ticketsPanel:ticketsPanel,copyTicket:copyTicket,renderTracker:renderTracker,toggleTrack:toggleTrack,exportTickets:exportTickets,restoreTickets:restoreTickets,hasPending:hasPending,grade:gradeEntry,panel:panel,board:board,attach:attach};
+  cache:CACHE,buildTickets:buildTickets,slipPanel:slipPanel,cardHTML:cardHTML,copySlipTk:copySlipTk,itemsFrom:itemsFrom,ticketsPanel:ticketsPanel,copyTicket:copyTicket,renderTracker:renderTracker,toggleTrack:toggleTrack,exportTickets:exportTickets,restoreTickets:restoreTickets,hasPending:hasPending,grade:gradeEntry,panel:panel,board:board,attach:attach};
 })();
 
 </script>
@@ -2820,6 +2893,16 @@ return{VER:VER,CFG:CFG,core:{grid:grid,outcome:outcome,probs:probs,fitTotal:fitT
     const r=__rr.apply(this,arguments);
     try{const el=document.getElementById("v2Tickets");if(el)el.innerHTML=V2.ticketsPanel(results);}catch(e){}
     return r;
+  };
+  const __bs=buildSlips;
+  buildSlips=function(){
+    // v1 slips are not built on this site (they live on the v1 site); only V2's own slips
+    const out=document.getElementById("slipOut");
+    try{
+      const tg=__slipTarget(),now=Date.now();
+      const ents=loadLog().filter(e=>__entryDay(e)===tg.day&&e.v2&&!(e.kickoffTs&&e.kickoffTs<now));
+      out.innerHTML=V2.slipPanel(tg.day,ents);
+    }catch(e){if(out)out.innerHTML="<div class='error-box'>V2 slip builder failed: "+(e&&e.message||e)+"</div>";}
   };
   const __rl=renderLog;
   renderLog=function(){
