@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="OddsOracle">
 <meta name="theme-color" content="#b0b0c8">
-<title>OddsOracle</title>
+<title>OddsOracle v3</title>
 <style>
 :root{
   --bg:#e8eaed;--s1:#ffffff;--s2:#f2f4f7;--s3:#e4e6ea;
@@ -140,11 +140,15 @@ textarea:focus{outline:none;border-color:var(--silver3);}
 <div class="tabs">
   <div class="tab active" id="tabAnalyse" onclick="switchTab('analyse')">&#x26A1; Analyse</div>
   <div class="tab" id="tabLog" onclick="switchTab('log')">&#x1F4CB; Log</div>
+  <div class="tab" id="tabScores" onclick="switchTab('scores')">&#x1F3AF; Scores</div>
+  <div class="tab" id="tabTracker" onclick="switchTab('tracker')">&#x1F4C5; Tracker</div>
 </div>
+<div id="slTab" class="zone" style="display:none"></div>
+<div id="trackerTab" class="zone" style="display:none"></div>
 <div id="analyseTab" class="zone">
 <div id="slipWrap" style="margin-bottom:12px">
     <div style="display:flex;gap:8px;margin-bottom:6px"><button class="btn-sm" id="dayToday" type="button" onclick="setSlipDay('today')">Today</button><button class="btn-sm" id="dayTomorrow" type="button" onclick="setSlipDay('tomorrow')">Tomorrow</button></div><div id="slipDayNote" style="font-size:11.5px;color:var(--dim);margin-bottom:8px"></div>
-    <button class="run-btn" type="button" onclick="buildSlips()" style="background:linear-gradient(135deg,#0d9488,#7c3aed);margin-bottom:8px">&#x1F3AF; Build V2 slips (Full Time, Over 1.5, Safest &middot; 2.20&ndash;2.50)</button>
+    <button class="run-btn" type="button" onclick="buildSlips()" style="background:linear-gradient(135deg,#0d9488,#7c3aed);margin-bottom:8px">&#x1F3AF; Build slips: V2 and V3 (Full Time, Over 1.5, Safest &middot; 2.20&ndash;2.50)</button>
     <div id="slipOut"></div>
   </div>
   <div id="inputSection">
@@ -168,6 +172,7 @@ textarea:focus{outline:none;border-color:var(--silver3);}
     <span id="thinkingText">Scanning markets...</span>
   </div>
   <div id="v2Tickets"></div>
+  <div id="v3Tickets"></div>
   <div id="resultSection" style="display:none"></div>
 </div>
 <div id="logTab" class="zone" style="display:none">
@@ -203,6 +208,9 @@ textarea:focus{outline:none;border-color:var(--silver3);}
   <div id="slipTrack"></div>
   <div id="v2Board"></div>
   <div id="v2TicketTrack"></div>
+  <div id="v3Board"></div>
+  <div id="v3TicketTrack"></div>
+  <div id="bgTrack"></div>
   <div id="scoreBox"></div>
   <div id="trashBox"></div>
   <div id="logContent"></div>
@@ -210,7 +218,7 @@ textarea:focus{outline:none;border-color:var(--silver3);}
 <script>
 // ── INLINE PWA (manifest + service worker as blobs) ──
 (function(){
-  const manifest={name:"OddsOracle v2",short_name:"OddsOracle v2",description:"Football odds analysis",start_url:"/",display:"standalone",orientation:"portrait",background_color:"#e8eaed",theme_color:"#374151",icons:[{src:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%23374151'/><text x='96' y='130' text-anchor='middle' font-size='100'>⚡</text></svg>",sizes:"192x192",type:"image/svg+xml"}]};
+  const manifest={name:"OddsOracle v3",short_name:"OddsOracle v3",description:"Football odds analysis",start_url:"/",display:"standalone",orientation:"portrait",background_color:"#e8eaed",theme_color:"#374151",icons:[{src:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%23374151'/><text x='96' y='130' text-anchor='middle' font-size='100'>⚡</text></svg>",sizes:"192x192",type:"image/svg+xml"}]};
   const mblob=new Blob([JSON.stringify(manifest)],{type:"application/json"});
   const link=document.createElement("link");link.rel="manifest";link.href=URL.createObjectURL(mblob);document.head.appendChild(link);
   const swCode=`const CACHE="oo-v3";const SHELL=self.location.href;self.addEventListener("install",e=>{e.waitUntil(caches.open(CACHE).then(c=>c.add(SHELL)).then(()=>self.skipWaiting()));});self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});self.addEventListener("fetch",e=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).then(res=>{const clone=res.clone();caches.open(CACHE).then(c=>c.put(e.request,clone));return res;}).catch(()=>caches.match(SHELL))));});`;
@@ -574,11 +582,11 @@ function __legInfo(date,leg){
   if(!e)return{r:"pending"};
   const ps=e.picks||[];const p=ps.find(q=>String(q.pick||"").trim()===leg.pick&&Math.abs(parseFloat(q.odds)-leg.odds)<0.011);
   const fs=(ps.find(q=>q.finalScore)||{}).finalScore||null;
-  return{r:p?p.result:"pending",fs,cs:e.cs||null};
+  return{r:p?p.result:"pending",fs,cs:e.cs||null,pp:e.pp||null};
 }
 function __legLine(date,l){
   const i=__legInfo(date,l);const col=i.r==="win"?"#16a34a":i.r==="loss"?"#dc2626":"#9090a8";
-  return "<div style='font-size:11.5px;color:var(--dim);padding-left:8px'>"+l.m+(l.ko?" &middot; plays "+l.ko.replace(/ 20\d\d$/,''):'')+" &middot; "+l.pick+" @ "+l.odds.toFixed(2)+" <span style='color:"+col+";font-weight:700'>"+(i.r==="win"?"W":i.r==="loss"?"L":i.r==="void"?"VOID":"&#x23F3;")+"</span>"+(i.cs?" &middot; predicted "+i.cs:"")+(i.fs?" &middot; <b>actual "+i.fs+"</b>":"")+"</div>";
+  return "<div style='font-size:11.5px;color:var(--dim);padding-left:8px'>"+l.m+(l.ko?" &middot; plays "+l.ko.replace(/ 20\d\d$/,''):'')+" &middot; "+l.pick+" @ "+l.odds.toFixed(2)+" <span style='color:"+col+";font-weight:700'>"+(i.r==="win"?"W":i.r==="loss"?"L":i.r==="void"?"VOID":(i.pp?"<span style='color:#d97706'>&#x23F8; postponed"+(i.pp==="overdue"?"?":"")+"</span>":"&#x23F3;"))+"</span>"+(i.cs?" &middot; predicted "+i.cs:"")+(i.fs?" &middot; <b>actual "+i.fs+"</b>":"")+"</div>";
 }
 function __slipStatus(date,legs){
   if(!legs.length)return null;
@@ -629,7 +637,7 @@ function exportLog(){
   const m=document.getElementById("backupMsg");
   try{
     let sl=[];try{sl=JSON.parse(localStorage.getItem("oo_slips")||"[]");}catch{}
-    const data={app:"OddsOracle",exported:new Date().toISOString(),log:loadLog(),slips:sl,v2tickets:(function(){try{return V2.exportTickets();}catch(e){return [];}})()};
+    const data={app:"OddsOracle",exported:new Date().toISOString(),log:loadLog(),slips:sl,v2tickets:(function(){try{return V2.exportTickets();}catch(e){return [];}})(),v3tickets:(function(){try{return V3.exportTickets();}catch(e){return [];}})(),tracker:(function(){try{return TK.exportData();}catch(e){return {};}})(),bgtickets:(function(){try{return BG.exportRecords();}catch(e){return [];}})(),scorelists:(function(){try{return SL.exportRecords();}catch(e){return [];}})()};
     const txt=JSON.stringify(data);
     const d=new Date(),pad=n=>String(n).padStart(2,"0");
     const name="oddsoracle-backup-"+d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"-"+pad(d.getHours())+pad(d.getMinutes())+".json";
@@ -708,13 +716,19 @@ function restoreLog(inp){
   const r=new FileReader();
   r.onload=()=>{
     try{
-      const __rawB=JSON.parse(r.result);const B=__readBackup(__rawB);const inc=B.log;
+      const __rawB=JSON.parse(r.result);
+      if(__rawB&&!Array.isArray(__rawB)&&!__rawB.log&&Object.keys(__rawB).some(k=>/^(bets6_|bank6_|start6_)/.test(k))){const n=TK.restoreData(__rawB);m.style.color="var(--green,#16a34a)";m.textContent="Tracker restored from your Betting Calendar backup: "+n+" records added.";inp.value="";return;}
+      const B=__readBackup(__rawB);const inc=B.log;
       const cur=loadLog();
       if(cur.length&&!confirm("File has "+inc.length+" matches; your log has "+cur.length+".\n\nOK = merge (same match = one entry, the copy with results and xG is kept)\nCancel = stop")){m.textContent="Nothing changed.";inp.value="";return;}
       const mr=__mergeLogs(cur,inc);
       saveLog(mr.log);
       if(Array.isArray(B.slips)){try{const have=JSON.parse(localStorage.getItem("oo_slips")||"[]");const hd=new Set(have.map(x=>x.date));localStorage.setItem("oo_slips",JSON.stringify(have.concat(B.slips.filter(x=>!hd.has(x.date)))));}catch{}}
       try{V2.restoreTickets(__rawB&&__rawB.v2tickets);}catch(__e){}
+      try{V3.restoreTickets(__rawB&&__rawB.v3tickets);}catch(__e){}
+      try{TK.restoreData(__rawB&&__rawB.tracker);}catch(__e){}
+      try{BG.restoreRecords(__rawB&&__rawB.bgtickets);}catch(__e){}
+      try{SL.restoreRecords(__rawB&&__rawB.scorelists);}catch(__e){}
       renderLog();
       const added=mr.log.length-cur.length;
       m.style.color="var(--green,#16a34a)";m.textContent="Restored: "+added+" new matches added, "+(inc.length-added)+" matched ones already in the log (merged, not doubled). Log now has "+mr.log.length+".";
@@ -1628,7 +1642,7 @@ async function checkResults(){
   let noAddr=0;
   try{
     for(const e of log){
-      if(!e.homeTeam||!e.awayTeam||!V2.hasPending(e))continue;
+      if(!e.homeTeam||!e.awayTeam||!(V2.hasPending(e)||V3.hasPending(e)))continue;
       const dn=__dayNum(e.date);
       if(!e.muUrl&&dn!=null&&today!=null&&today-dn>1){e.noMu=true;noAddr++;skipSet.add(e);continue;}
       const k=__rkey(e);if(!reps.has(k))reps.set(k,e);
@@ -1638,7 +1652,7 @@ async function checkResults(){
     await Promise.all(Array.from({length:Math.min(6,keys.length)},worker));
     let graded=0,voided=0,notDone=0,live=0,hand=0,errs=0,skipped=0;const counted=new Set();
     for(const e of log){
-      if(skipSet.has(e)||!e.homeTeam||!e.awayTeam||!V2.hasPending(e))continue;
+      if(skipSet.has(e)||!e.homeTeam||!e.awayTeam||!(V2.hasPending(e)||V3.hasPending(e)))continue;
       const k=__rkey(e),r=R[k];if(!r)continue;
       const first=!counted.has(k);counted.add(k);
       if(!r.ok){
@@ -1647,7 +1661,12 @@ async function checkResults(){
         continue;
       }
       if(e.noMu)delete e.noMu;
-      if(!r.finished){if(first){notDone++;if(r.live)live++;}continue;}
+      if(r.finished&&e.pp==='overdue')delete e.pp;
+      if(!r.finished){
+        const __st=String(r.status||''),__ko=e.kickoffTs||0,__dn2=__dayNum(e.date);
+        if(/postp|ppd|resched|cancel|abandon|suspend|delay|walkover|w\.?o\.?/i.test(__st))e.pp='postponed';
+        else if(!r.live&&((__ko&&Date.now()-__ko>30*3600e3)||(!__ko&&__dn2!=null&&today!=null&&today-__dn2>=2)))e.pp='overdue';
+        if(first){notDone++;if(r.live)live++;}continue;}
       e.picks=e.picks.map(p=>{
         if(p.result!=="pending")return p;
         const g=gradePick(p.pick,r.hs,r.as);
@@ -1655,6 +1674,7 @@ async function checkResults(){
         graded++; if(g==="void")voided++; return {...p,result:g,auto:true,finalScore:r.hs+"-"+r.as};
       });
       try{V2.grade(e,r.hs,r.as);}catch(__e){}
+      try{V3.grade(e,r.hs,r.as);}catch(__e){}
     }
     saveLog(log); renderLog();
     msg.textContent="Checked "+keys.length+" match(es). Graded "+graded+" pick(s)"+(voided?" ("+voided+" draw-no-bet draws voided)":"")+". Still playing: "+live+". Not finished: "+(notDone-live)+". Grade by hand: "+(hand+noAddr)+" (listed under Results to grade by hand in the Log)."+(errs?" Could not reach mutating for "+errs+": tap again.":"")+(skipped?" Left for you to mark: "+skipped+".":"");
@@ -1757,6 +1777,7 @@ function runAnalysis(){
     }
   }
   try{V2.attach(log,outcomes);}catch(__e){}
+  try{V3.attach(log,outcomes);}catch(__e){}
   saveLog(log);
   renderResult(outcomes,skipped);
   renderTrash();
@@ -2364,7 +2385,7 @@ function renderLog(){window.__pmFns={};setTimeout(backupReminder,0);setTimeout(r
             (p.result==="pending"?"<div class=\"pending-tag\">&#x23F3;</div>":"<div style=\"font-size:11px;font-weight:700;color:"+resColor+"\">"+resLabel(p.result)+"</div>")+
             "</div></div>";
         }).join("")+
-        "</div>"+(function(){try{return V2.cardHTML(entry);}catch(x){return "";}})()+"</div>";
+        "</div>"+(function(){try{return V2.cardHTML(entry)+V3.cardHTML(entry);}catch(x){return "";}})()+"</div>";
     }).join("");
     if(shownLog.length>__logShow)html+="<button class='btn-sm' style='width:100%;padding:12px;margin:8px 0' onclick='__logShow+=200;renderLog()'>Show 200 more ("+(shownLog.length-__logShow)+" older matches hidden)</button>";}
   document.getElementById("logContent").innerHTML=statsHTML+html;
@@ -2386,7 +2407,13 @@ function switchTab(tab){
   document.getElementById("logTab").style.display=tab==="log"?"block":"none";
   document.getElementById("tabAnalyse").className="tab"+(tab==="analyse"?" active":"");
   document.getElementById("tabLog").className="tab"+(tab==="log"?" active":"");
+  document.getElementById("trackerTab").style.display=tab==="tracker"?"block":"none";
+  document.getElementById("tabTracker").className="tab"+(tab==="tracker"?" active":"");
+  document.getElementById("slTab").style.display=tab==="scores"?"block":"none";
+  document.getElementById("tabScores").className="tab"+(tab==="scores"?" active":"");
+  if(tab==="scores"){try{SL.render();}catch(e){}}
   if(tab==="log")renderLog();
+  if(tab==="tracker"){try{TK.open();}catch(e){}}
 }
 function resetApp(){
   document.getElementById("oddsInput").value="";
@@ -2784,9 +2811,10 @@ const legsOf=t=>t?t.legs.map(l=>({m:l.h+' vs '+l.a,h:l.h,a:l.a,n:l.n,o:l.o,s:l.s
 function legInfo(date,leg,log){
   const e=log.find(x=>(x.date===date||x.kickoffDate===date)&&x.homeTeam===leg.h&&x.awayTeam===leg.a);
   if(!e)return{r:'pending'};
+  if(__ppVoid(e))return{r:'void',pp:e.pp,cs:e.cs||null};
   const fs=e.finalScore||((e.picks||[]).find(q=>q.finalScore)||{}).finalScore||null;
   const m=fs?String(fs).match(/^(\d+)-(\d+)$/):null;
-  if(!m||!leg.s)return{r:'pending',cs:e.cs||null};
+  if(!m||!leg.s)return{r:'pending',cs:e.cs||null,pp:e.pp||null};
   const o=outcome(leg.s,+m[1],+m[2]);
   return{r:o>0?'win':(o===0?'void':'loss'),fs:fs,cs:e.cs||null};
 }
@@ -2877,7 +2905,7 @@ function renderTracker(){
   const log=(typeof loadLog==='function')?loadLog():[];
   const tot={diamond:{w:0,l:0,p:0,net:0},silver:{w:0,l:0,p:0,net:0},safest:{w:0,l:0,p:0,net:0}};
   const col=st=>st==='win'?'#16a34a':(st==='loss'?'#dc2626':'#9090a8');
-  const legLine=(date,l)=>{const i=legInfo(date,l,log);return "<div style='font-size:11.5px;color:var(--dim);padding-left:8px'>"+esc(l.m)+" &middot; "+esc(l.n)+" @ "+l.o.toFixed(2)+" <span style='color:"+col(i.r)+";font-weight:700'>"+(i.r==='win'?'W':i.r==='loss'?'L':i.r==='void'?'VOID':'&#x23F3;')+"</span>"+(i.cs?" &middot; predicted "+esc(i.cs):"")+(i.fs?" &middot; <b>actual "+esc(i.fs)+"</b>":"")+"</div>";};
+  const legLine=(date,l)=>{const i=legInfo(date,l,log);return "<div style='font-size:11.5px;color:var(--dim);padding-left:8px'>"+esc(l.m)+" &middot; "+esc(l.n)+" @ "+l.o.toFixed(2)+" <span style='color:"+col(i.r)+";font-weight:700'>"+(i.r==='win'?'W':i.r==='loss'?'L':i.r==='void'?('VOID'+(i.pp?' &middot; postponed':'')):(i.pp?'<span style="color:#d97706">&#x23F8; postponed'+(i.pp==='overdue'?'?':'')+'</span>':'&#x23F3;'))+"</span>"+(i.cs?" &middot; predicted "+esc(i.cs):"")+(i.fs?" &middot; <b>actual "+esc(i.fs)+"</b>":"")+"</div>";};
   const rows=recs.map(r=>{
     const cell=k=>{
       const legs=r[k]||[];const st=ticketStatus(r.date,legs,log);if(!st)return '';
@@ -2885,7 +2913,7 @@ function renderTracker(){
       const prod=(live.length?live:legs).reduce((m,l)=>m*l.o,1);
       const t=st==='win'?'w':(st==='loss'?'l':'p');tot[k][t]++;
       if(st==='win')tot[k].net+=1000*(prod-1);if(st==='loss')tot[k].net-=1000;
-      return "<div style='font-size:12px'><b>"+TK_NAME[k]+"</b> "+prod.toFixed(2)+" <span style='color:"+col(st)+";font-weight:700'>"+(st==='win'?'WIN':st==='loss'?'LOSS':'&#x23F3;')+"</span></div>"+legs.map(l=>legLine(r.date,l)).join('');
+      return "<div style='font-size:12px'><b>"+TK_NAME[k]+"</b> "+prod.toFixed(2)+" <span style='color:"+col(st)+";font-weight:700'>"+(st==='win'?'WIN':st==='loss'?'LOSS':'&#x23F3;'+(legs.some(l=>{const q=legInfo(r.date,l,log);return q.pp&&q.r==='pending';})?' <span style="font-weight:600;color:#d97706;font-size:11px">unsettled &middot; postponed leg</span>':''))+"</span></div>"+legs.map(l=>legLine(r.date,l)).join('');
     };
     return "<div style='padding:7px 0;border-top:1px solid var(--bd)'><div style='font-size:11px;color:var(--dim);margin-bottom:2px'>"+esc(r.date)+"</div>"+cell('diamond')+cell('silver')+cell('safest')+"</div>";
   }).join('');
@@ -2948,7 +2976,1088 @@ return{VER:VER,CFG:CFG,core:{grid:grid,outcome:outcome,probs:probs,fitTotal:fitT
   };
 })();
 </script>
+<script>
+/* ===== OddsOracle v3 - all-markets shadow engine =====
+   Runs BESIDE the frozen v1 rules. It never changes v1 picks, only adds a second opinion and logs it.
+   One expected-goals source -> one Dixon-Coles score grid -> every market is read from that grid. */
+const V3=(function(){
+'use strict';
+const VER='v3.0';
+// ---- Configuration (assumptions: tune only after the backtest says so) ----
+const CFG={
+  leagueAvg:2.6,   // baseline goals per match used to shrink team stats (assumption)
+  wTeam:0.70,      // weight on team stats; the rest is league average
+  shrink:0.50,     // v3: pull every model probability halfway back toward the market's own (margin-removed) probability
+  mktWeight:0.70,  // weight on the market-implied goals (market is a strong prior)
+  rho:-0.08,       // Dixon-Coles low-score correction
+  N:10,            // grid size (0..N goals each)
+  showPriced:false, // 'likely but priced in' stays in the scan list only, never a pick
+  minOdds:1.10, maxPicks:3, poolSize:10, disagree:0.8, closestMinP:0.55,
+  tier:{valueP:0.60,valueEV:0.03,bestP:0.65,bestEVlo:-0.03,pricedP:0.75}
+};
+const TIER_RANK={VALUE:3,BEST:2,PRICED:1,CLOSEST:0};
+const TIER_LABEL={VALUE:'VALUE',BEST:'BEST AVAILABLE',PRICED:'LIKELY, PRICED IN',CLOSEST:'CLOSEST'};
+const TIER_COL={VALUE:'#16a34a',BEST:'#2563eb',PRICED:'#d97706',CLOSEST:'#6b7280'};
 
+// ---- Maths ----
+const pois=(l,k)=>{let p=Math.exp(-l);for(let i=1;i<=k;i++)p*=l/i;return p;};
+function grid(lh,la){
+  const N=CFG.N,rho=CFG.rho,cells=[];let sum=0;
+  for(let i=0;i<=N;i++)for(let j=0;j<=N;j++){
+    let t=1;
+    if(i===0&&j===0)t=1-lh*la*rho;else if(i===0&&j===1)t=1+lh*rho;else if(i===1&&j===0)t=1+la*rho;else if(i===1&&j===1)t=1-rho;
+    const q=pois(lh,i)*pois(la,j)*Math.max(t,0);cells.push([i,j,q]);sum+=q;
+  }
+  for(const c of cells)c[2]/=sum;
+  return cells;
+}
+// goals for one market outcome: 1 = win, 0 = push (stake back), -1 = loss. Used for BOTH probabilities and grading.
+function outcome(sp,i,j){
+  const T=i+j;
+  switch(sp.t){
+    case 'ou':{const x=sp.d==='over'?T-sp.l:sp.l-T;return x>0?1:(x===0?0:-1);}
+    case 'btts':return ((i>0&&j>0)===sp.y)?1:-1;
+    case 'x2':{const r=i>j?'1':(i===j?'X':'2');return sp.o.indexOf(r)>=0?1:-1;}
+    case 'dnb':if(i===j)return 0;return ((i>j)===(sp.o==='1'))?1:-1;
+    case 'tt':{const g=sp.side==='h'?i:j;const x=sp.d==='over'?g-sp.l:sp.l-g;return x>0?1:(x===0?0:-1);}
+    case 'hcp':{const d=sp.side==='h'?(i-j+sp.h):(j-i+sp.h);return d>0?1:(d===0?0:-1);}
+    case 'oe':return ((T%2===1)===(sp.o==='odd'))?1:-1;
+    case 'multi':return (T>=sp.a&&T<=sp.b)?1:-1;
+    case 'cs':{const conceded=sp.side==='h'?j:i;return ((conceded===0)===sp.y)?1:-1;}
+    case 'wtn':{const w=sp.side==='h'?(i>j&&j===0):(j>i&&i===0);return (w===sp.y)?1:-1;}
+  }
+  return -1;
+}
+function probs(cells,sp){let pw=0,pp=0,pl=0;for(const c of cells){const r=outcome(sp,c[0],c[1]);if(r>0)pw+=c[2];else if(r===0)pp+=c[2];else pl+=c[2];}return{pw,pp,pl};}
+function fitTotal(ou){
+  if(!ou.length)return null;let best=null,bd=1e9;
+  for(let t=0.6;t<=6;t+=0.02){let d=0;for(const m of ou){let cdf=0;for(let k=0;k<=Math.floor(m.line);k++)cdf+=pois(t,k);d+=Math.pow(1-cdf-m.pOver,2);}if(d<bd){bd=d;best=t;}}
+  return best;
+}
+function fitShare(tot,diff){
+  let bs=0.5,bd=1e9;
+  for(let s=0.15;s<=0.85;s+=0.01){
+    const lh=tot*s,la=tot*(1-s);let a=0,b=0;
+    for(let i=0;i<=8;i++){const pi=pois(lh,i);for(let j=0;j<=8;j++){const q=pi*pois(la,j);if(i>j)a+=q;else if(j>i)b+=q;}}
+    const d=Math.abs((a-b)-diff);if(d<bd){bd=d;bs=s;}
+  }
+  return bs;
+}
+
+// ---- Market extraction from the parsed odds board (odds.all_markets) ----
+const norm=s=>String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
+function extract(odds){
+  const hn=norm(odds.homeTeam),an=norm(odds.awayTeam),out=[],ex={cs:0,exact:0},hc=[];
+  const side=t=>{t=norm(t);if(t===hn)return 'h';if(t===an)return 'a';if(hn&&t.indexOf(hn)>=0)return 'h';if(an&&t.indexOf(an)>=0)return 'a';return null;};
+  const add=(name,sp,o,fam)=>out.push({name:name,sp:sp,odds:o,fam:fam||''});
+  for(const m of (odds.all_markets||[])){
+    const sec=norm(m.section),lab=String(m.label).trim(),o=+m.odds;if(!(o>1))continue;let r;
+    if(sec==='1x2 | full time'){
+      if(lab==='1')add('Home Win (1X2)',{t:'x2',o:'1'},o,'1x2');else if(/^x$/i.test(lab))add('Draw (1X2)',{t:'x2',o:'X'},o,'1x2');else if(lab==='2')add('Away Win (1X2)',{t:'x2',o:'2'},o,'1x2');
+    }else if(sec==='double chance | full time'){
+      const k=lab.toUpperCase();if(k==='1X'||k==='X2'||k==='12')add('Double Chance '+k,{t:'x2',o:k},o,'dc');
+    }else if(sec==='draw no bet | full time'){
+      if(lab==='1')add('DNB Home',{t:'dnb',o:'1'},o,'dnb');else if(lab==='2')add('DNB Away',{t:'dnb',o:'2'},o,'dnb');
+    }else if(sec==='over/under | full time'){
+      if((r=lab.match(/^(Over|Under)\s+([0-9.]+)$/i)))add(r[1][0].toUpperCase()+r[1].slice(1).toLowerCase()+' '+r[2],{t:'ou',d:r[1].toLowerCase(),l:+r[2]},o,'ou'+r[2]);
+    }else if(sec==='both teams to score | full time'){
+      if(/^yes$/i.test(lab))add('BTTS Yes',{t:'btts',y:true},o,'btts');else if(/^no$/i.test(lab))add('BTTS No',{t:'btts',y:false},o,'btts');
+    }else if(sec==='odd/even | full time'){
+      if(/^odd$/i.test(lab))add('Total Goals Odd',{t:'oe',o:'odd'},o,'oe');else if(/^even$/i.test(lab))add('Total Goals Even',{t:'oe',o:'even'},o,'oe');
+    }else if(sec==='2-way handicap | full time'){
+      if(/^[+-][0-9.]+$/.test(lab))hc.push({lab:lab,v:+lab,o:o});
+    }else if(sec==='multigoals | full time'){
+      if((r=lab.match(/^(\d+)-(\d+)$/)))add('Total Goals '+lab,{t:'multi',a:+r[1],b:+r[2]},o,'multi');
+      else if(/^7\+$/.test(lab))add('Total Goals 7+',{t:'multi',a:7,b:99},o,'multi');
+    }else if(sec==='total goals exact | full time'){ex.exact++;}
+    else if(sec==='correct score | full time'){ex.cs++;}
+    else if((r=sec.match(/^([a-z\/ \-]+) \| (.+) \| full time$/))){
+      const kind=r[1].trim(),sd=side(r[2]);if(!sd)continue;const T=sd==='h'?'Home':'Away';
+      if(kind==='over/under'&&(r=lab.match(/^(Over|Under)\s+([0-9.]+)$/i)))add(T+' Team '+r[1][0].toUpperCase()+r[1].slice(1).toLowerCase()+' '+r[2],{t:'tt',side:sd,d:r[1].toLowerCase(),l:+r[2]},o,'tt'+sd+r[2]);
+      else if(kind==='clean sheet'&&/^(yes|no)$/i.test(lab))add(T+' Clean Sheet '+(/^yes$/i.test(lab)?'Yes':'No'),{t:'cs',side:sd,y:/^yes$/i.test(lab)},o,'cs'+sd);
+      else if(kind==='win to nil'&&/^(yes|no)$/i.test(lab))add(T+' Win To Nil '+(/^yes$/i.test(lab)?'Yes':'No'),{t:'wtn',side:sd,y:/^yes$/i.test(lab)},o,'wtn'+sd);
+    }
+  }
+  // Handicap: columns print home then away. A pair is only trusted when the two labels are exact opposites; lone entries are skipped.
+  for(let k=0;k<hc.length;){
+    const a=hc[k],b=hc[k+1];
+    if(b&&a.v===-b.v){
+      const fmt=v=>(v>0?'+':'')+v;
+      add('Handicap Home '+fmt(a.v),{t:'hcp',side:'h',h:a.v},a.o,'hcp');
+      add('Handicap Away '+fmt(b.v),{t:'hcp',side:'a',h:b.v},b.o,'hcp');k+=2;
+    }else k++;
+  }
+  return{list:out,excluded:ex};
+}
+const sideKey=sp=>{
+  switch(sp.t){
+    case 'x2':return {'1':'H','1X':'H','2':'A','X2':'A','X':'D','12':'ND'}[sp.o];
+    case 'dnb':return sp.o==='1'?'H':'A';
+    case 'hcp':return sp.side==='h'?'H':'A';
+    case 'ou':return 'tot_'+sp.d;
+    case 'btts':return 'btts_'+sp.y;
+    case 'tt':return 'tt_'+sp.side+'_'+sp.d;
+    case 'oe':return 'oe';
+    case 'multi':return 'multi';
+    case 'cs':return 'cs_'+sp.side+'_'+sp.y;
+    case 'wtn':return 'wtn_'+sp.side+'_'+sp.y;
+  }
+  return sp.t;
+};
+
+// ---- Model: expected goals, then the grid ----
+function marketInfo(list){
+  const g=(n)=>{const c=list.find(x=>x.name===n);return c?c.odds:null;};
+  const ou=[];
+  for(const L of [1.5,2.5,3.5]){const o=g('Over '+L),u=g('Under '+L);if(o&&u)ou.push({line:L,pOver:(1/o)/(1/o+1/u)});}
+  const lamT=fitTotal(ou);
+  const h=g('Home Win (1X2)'),d=g('Draw (1X2)'),a=g('Away Win (1X2)');
+  let diff=null;if(h&&d&&a){const s=1/h+1/d+1/a;diff=(1/h-1/a)/s;}
+  return{lamT:lamT,diff:diff};
+}
+function expectedGoals(odds,form,list){
+  const mk=marketInfo(list);
+  const hGF=form&&form.home_goals_scored,aGF=form&&form.away_goals_scored,hGA=form&&form.home_goals_conceded,aGA=form&&form.away_goals_conceded;
+  const haveStats=[hGF,aGF,hGA,aGA].every(v=>v!=null&&isFinite(v));
+  let tMkt=mk.lamT,sMkt=(mk.lamT&&mk.diff!=null)?fitShare(mk.lamT,mk.diff):null;
+  let lamH,lamA,mode,dis=null;
+  if(haveStats){
+    const lg=CFG.leagueAvg/2,w=CFG.wTeam;
+    const mh=w*(hGF+aGA)/2+(1-w)*lg,ma=w*(aGF+hGA)/2+(1-w)*lg,mt=mh+ma,ms=mh/mt;
+    if(tMkt){
+      const tot=(1-CFG.mktWeight)*mt+CFG.mktWeight*tMkt;
+      const sh=sMkt!=null?(1-CFG.mktWeight)*ms+CFG.mktWeight*sMkt:ms;
+      lamH=tot*sh;lamA=tot*(1-sh);dis=Math.abs(mt-tMkt);mode='stats+market';
+    }else{lamH=mh;lamA=ma;mode='stats-only';}
+  }else if(tMkt){
+    const sh=sMkt!=null?sMkt:0.5;lamH=tMkt*sh;lamA=tMkt*(1-sh);mode='market-only';
+  }else return null;
+  return{lamH:lamH,lamA:lamA,mode:mode,disagree:dis,lamMkt:tMkt};
+}
+
+// ---- Evaluation, tiers, selection ----
+function tierOf(c){
+  const T=CFG.tier;
+  if(c.p>=T.valueP&&c.ev>=T.valueEV)return 'VALUE';
+  if(c.p>=T.bestP&&c.ev>=T.bestEVlo&&c.ev<T.valueEV)return 'BEST';
+  if(c.p>=T.pricedP&&c.ev<T.bestEVlo)return 'PRICED';
+  return null;
+}
+function run(odds,form){return run_(odds,form);}
+function run_(odds,form){
+  if(!odds||!odds.all_markets||!odds.all_markets.length)return null;
+  const ext=extract(odds),eg=expectedGoals(odds,form,ext.list);
+  if(!eg)return null;
+  const cells=grid(eg.lamH,eg.lamA);
+  const all=[];
+  for(const m of ext.list){
+    const pr=probs(cells,m.sp),den=pr.pw+pr.pl;if(den<=0)continue;
+    all.push({n:m.name,o:m.odds,p:pr.pw/den,pw:pr.pw,pp:pr.pp,ev:pr.pw*m.odds+pr.pp-1,s:m.sp,g:sideKey(m.sp),fam:m.fam});
+  }
+  // fair (margin-free) price where a market has a clean two-way pair on the board, shown for reference
+  for(const c of all){
+    const sib=all.find(x=>x!==c&&x.fam===c.fam&&x.g!==c.g&&(c.fam.indexOf('ou')===0||c.fam==='btts'||c.fam==='oe'||/^tt/.test(c.fam)));
+    if(sib){c.margin=1/c.o+1/sib.o-1;c.fair=(1/c.o)/(1/c.o+1/sib.o);}
+  }
+  // v3 SHRINK: v2 was ~11-12 points too confident (12-17 Nov data). Blend each probability with the market's de-margined probability (8% margin assumed where no clean pair exists), then re-price the edge.
+  for(const c of all){
+    const pm=(c.fair!=null)?c.fair:1/(c.o*1.08),den=c.pw/c.p,p2=(1-CFG.shrink)*c.p+CFG.shrink*pm;
+    c.p0=c.p;c.p=p2;c.pw=p2*den;c.ev=c.pw*c.o+c.pp-1;
+  }
+  const elig=all.filter(c=>c.o>=CFG.minOdds);
+  for(const c of elig)c.t=tierOf(c);
+  const rank=(a,b)=>(TIER_RANK[b.t||'CLOSEST']-TIER_RANK[a.t||'CLOSEST'])||(b.p-a.p)||(b.ev-a.ev);
+  elig.sort(rank);
+  const seen={},pool=[];
+  for(const c of elig){if(seen[c.g])continue;seen[c.g]=1;pool.push(c);}
+  // Never force a pick: only VALUE and BEST AVAILABLE can be picks. If nothing qualifies the match is skipped.
+  const picks=pool.filter(c=>c.t&&(c.t!=='PRICED'||CFG.showPriced)).slice(0,CFG.maxPicks);
+  const fallback=false;
+  const lowRel=eg.mode==='market-only'||(eg.disagree!=null&&eg.disagree>CFG.disagree);
+  return{eg:eg,picks:picks,pool:pool.slice(0,CFG.poolSize),all:all,fallback:fallback,noPick:picks.length===0,lowRel:lowRel,excluded:ext.excluded,
+    store:null};
+}
+function toStore(r){
+  const pickSet=new Set(r.picks);
+  const rows=[];const seen=new Set();
+  for(const c of r.picks.concat(r.pool)){if(seen.has(c))continue;seen.add(c);rows.push(c);}
+  // also keep the best ticket-eligible markets (full time, Over 1.5, highest chance) so V3 slips can be rebuilt later from the log
+  for(const tk of Object.keys(TYPES)){
+    const T=TYPES[tk];
+    const q=r.all.filter(x=>x.o>=CFG.minOdds&&x.p>=T.minP&&x.ev>=T.minEV&&T.ok(x)).sort((a,b)=>b.p-a.p).slice(0,4);
+    for(const c of q){if(seen.has(c))continue;seen.add(c);rows.push(c);}
+  }
+  return{v:VER,m:r.eg.mode,lh:+r.eg.lamH.toFixed(2),la:+r.eg.lamA.toFixed(2),lm:r.eg.lamMkt?+r.eg.lamMkt.toFixed(2):null,lr:r.lowRel?1:0,
+    c:rows.map(c=>({n:c.n,o:c.o,p:+c.p.toFixed(3),e:+c.ev.toFixed(3),t:c.t||null,k:pickSet.has(c)?1:0,s:c.s,r:'pending'})),
+    a:r.all.filter(c=>c.o>=CFG.minOdds).sort((x,y)=>y.p-x.p).map(c=>({n:c.n,o:c.o,p:+c.p.toFixed(3),e:+c.ev.toFixed(3),s:c.s}))};
+}
+function gradeEntry(e,hs,as){
+  if(!e||!e.v3||!e.v3.c)return 0;let n=0;
+  for(const c of e.v3.c){
+    if(c.r!=='pending')continue;
+    const o=outcome(c.s,hs,as);c.r=o>0?'win':(o===0?'void':'loss');n++;
+  }
+  e.finalScore=hs+'-'+as;return n;
+}
+const hasPending=e=>((e.picks||[]).some(p=>p.result==='pending'))||((e.v3&&e.v3.c)||[]).some(c=>c.r==='pending');
+
+// ---- UI ----
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+const pc=x=>(x*100).toFixed(0)+'%',sg=x=>(x>=0?'+':'')+(x*100).toFixed(1)+'%';
+function panel(odds,form,cached){
+  const r=cached||run(odds,form);if(!r)return '';
+  const e=r.eg;
+  let h="<div style='margin-top:12px;background:var(--s2);border:1.5px solid var(--bd);border-radius:14px;padding:12px 14px'>";
+  h+="<div style='font-size:12.5px;font-weight:800;margin-bottom:2px'>v3 &middot; all markets <span style='font-weight:600;color:var(--dim)'>(shadow, unvalidated)</span></div>";
+  h+="<div style='font-size:11.5px;color:var(--dim);margin-bottom:8px'>Expected goals "+e.lamH.toFixed(2)+" - "+e.lamA.toFixed(2)+" ("+(e.lamH+e.lamA).toFixed(2)+" total) &middot; basis: "+esc(e.mode)+(e.lamMkt?" &middot; market total "+e.lamMkt.toFixed(2):"")+"</div>";
+  if(r.lowRel)h+="<div style='font-size:11.5px;color:#b45309;margin-bottom:8px'>Lower reliability: "+(e.mode==='market-only'?"no usable team stats, so the model only mirrors the market.":"team stats and the market disagree by "+e.disagree.toFixed(2)+" goals.")+"</div>";
+  if(!r.picks.length)h+="<div style='font-size:13px;font-weight:800;padding:8px 0;border-top:1px solid var(--bd)'>NO PICK</div><div style='font-size:12px;color:var(--dim);margin-bottom:6px'>No market is both likely enough and fairly priced on this match. Skipping it is the right call.</div>";
+  for(const c of r.picks){
+    const col=TIER_COL[c.t||'CLOSEST'];
+    h+="<div style='display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--bd)'><div><span style='font-size:10px;font-weight:800;color:#fff;background:"+col+";border-radius:6px;padding:2px 6px'>"+TIER_LABEL[c.t||'CLOSEST']+"</span><div style='font-size:13.5px;font-weight:700;margin-top:3px'>"+esc(c.n)+"</div><div style='font-size:11.5px;color:var(--dim)'>chance "+pc(c.p)+" &middot; return "+sg(c.ev)+(c.fair!=null?" &middot; market fair "+pc(c.fair):"")+"</div></div><div style='font-size:15px;font-weight:800'>@ "+c.o.toFixed(2)+"</div></div>";
+  }
+  const rows=r.all.filter(c=>c.o>=CFG.minOdds).sort((a,b)=>b.p-a.p).slice(0,40);
+  h+="<details style='margin-top:8px'><summary style='font-size:12px;font-weight:700;cursor:pointer'>Scan all "+r.all.length+" markets</summary><div style='font-size:11.5px;margin-top:6px;line-height:1.7'>";
+  for(const c of rows)h+="<div style='display:flex;justify-content:space-between'><span>"+esc(c.n)+"</span><span>"+pc(c.p)+" &middot; @"+c.o.toFixed(2)+" &middot; "+sg(c.ev)+"</span></div>";
+  h+="<div style='color:var(--dim);margin-top:6px'>Correct score ("+r.excluded.cs+" prices) and exact goals ("+r.excluded.exact+" prices) are excluded: their margin is too large to beat. Halves and combo markets are not modelled yet.</div></div></details>";
+  h+="</div>";return h;
+}
+function board(){
+  const log=(typeof loadLog==='function')?loadLog():[];
+  const T={VALUE:[],BEST:[],PRICED:[],CLOSEST:[]},allc=[];let v1=[];
+  for(const e of log){
+    if(!e.v3||!e.v3.c)continue;
+    let any=false;
+    for(const c of e.v3.c){
+      if(c.r!=='win'&&c.r!=='loss'&&c.r!=='void')continue;any=true;
+      allc.push(c);if(c.k&&T[c.t||'CLOSEST'])T[c.t||'CLOSEST'].push(c);
+    }
+    if(any)for(const p of (e.picks||[]))if((p.result==='win'||p.result==='loss'||p.result==='void')&&p.odds)v1.push(p);
+  }
+  const prof=(c,o)=>c.r==='win'?o-1:(c.r==='void'?0:-1);
+  const sum=rs=>{const s=rs.filter(c=>c.r==='win'||c.r==='loss');if(!s.length)return null;const w=s.filter(c=>c.r==='win').length;
+    return{n:s.length,win:w/s.length,roi:rs.reduce((a,c)=>a+prof(c,c.o),0)/rs.length,p:s.reduce((a,c)=>a+c.p,0)/s.length};};
+  let nV3=0,nNo=0;for(const e of log){if(!e.v3||!e.v3.c)continue;nV3++;if(!e.v3.c.some(c=>c.k))nNo++;}
+  let h="<div style='background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;margin-bottom:10px;padding:11px 14px'><div style='font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:6px'>v3 shadow scoreboard (flat 1 unit)</div>";
+  if(nV3)h+="<div style='font-size:12px;color:var(--dim);margin-bottom:4px'>Matches skipped with no pick: "+nNo+" of "+nV3+" ("+Math.round(nNo/nV3*100)+"%)</div>";
+  const tkh="";
+  const settled=allc.filter(c=>c.r==='win'||c.r==='loss');
+  if(!settled.length){h+="<div style='font-size:12px;color:var(--dim)'>No settled v3 picks yet. Analyse matches, then use Check results.</div></div>";return h;}
+  const line=(name,s)=>s?"<div style='display:flex;justify-content:space-between;font-size:12px;padding:3px 0'><span>"+name+" ("+s.n+")</span><span>hit "+pc(s.win)+" &middot; model "+pc(s.p)+" &middot; ROI "+sg(s.roi)+"</span></div>":"";
+  for(const k of ['VALUE','BEST','PRICED','CLOSEST'])h+=line(TIER_LABEL[k],sum(T[k]));
+  const v1s=v1.length?(()=>{const w=v1.filter(p=>p.result==='win').length,l=v1.filter(p=>p.result==='loss').length,pr=v1.reduce((a,p)=>a+(p.result==='win'?p.odds-1:(p.result==='loss'?-1:0)),0);return{n:w+l,win:(w+l)?w/(w+l):0,roi:(w+l)?pr/(w+l):0,p:0};})():null;
+  if(v1s&&v1s.n)h+="<div style='display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-top:1px solid var(--bd);margin-top:4px'><span>v1 picks, same matches ("+v1s.n+")</span><span>hit "+pc(v1s.win)+" &middot; ROI "+sg(v1s.roi)+"</span></div>";
+  // calibration of the model across every stored market (not just picks)
+  const bk=[[0.5,0.6],[0.6,0.7],[0.7,0.8],[0.8,1.01]];let cal="";
+  for(const b of bk){const s=settled.filter(c=>c.p>=b[0]&&c.p<b[1]);if(s.length>=10){const w=s.filter(c=>c.r==='win').length/s.length,mp=s.reduce((a,c)=>a+c.p,0)/s.length;cal+="<div style='font-size:11.5px;color:var(--dim)'>model "+pc(mp)+" &rarr; actual "+pc(w)+" ("+s.length+")</div>";}}
+  const brier=settled.reduce((a,c)=>a+Math.pow(c.p-(c.r==='win'?1:0),2),0)/settled.length;
+  h+="<div style='margin-top:6px;font-size:11.5px;font-weight:700'>Calibration (all stored markets) &middot; Brier "+brier.toFixed(3)+"</div>"+cal;
+  h+="<div style='font-size:11px;color:var(--dim);margin-top:6px'>Trust nothing here until about 300 settled picks per tier.</div></div>";
+  return h;
+}
+const CACHE=(typeof WeakMap!=='undefined')?new WeakMap():null;
+// ---- Tickets: Diamond (best) and Silver (next best, different matches). Never forced. ----
+function itemsFrom(list){
+  const out=[];
+  for(const r of (Array.isArray(list)?list:[list])){
+    if(!r)continue;
+    let run=r.v3run||(CACHE&&r.odds?CACHE.get(r.odds):null);
+    if(!run&&r.odds){try{run=run_(r.odds,r.form);}catch(e){run=null;}}
+    const h=(r.odds&&r.odds.homeTeam)||(r.result&&r.result.homeTeam)||'',a=(r.odds&&r.odds.awayTeam)||(r.result&&r.result.awayTeam)||'';
+    out.push({home:h,away:a,run:run});
+  }
+  return out;
+}
+const TYPES={
+  Diamond:{label:'Full-time result',lo:2.20,hi:2.50,minLegs:2,maxLegs:3,minP:0.65,minEV:-0.02,minTicketEV:-0.03,
+    ok:c=>(c.s.t==='x2'&&['1','2','1X','X2'].indexOf(c.s.o)>=0)||c.s.t==='dnb'},
+  Silver:{label:'Over 1.5 goals',lo:2.20,hi:2.50,minLegs:2,maxLegs:4,minP:0.65,minEV:-0.02,minTicketEV:-0.03,
+    ok:c=>c.s.t==='ou'&&c.s.d==='over'&&c.s.l===1.5},
+  Safest:{label:'Highest chance',lo:2.20,hi:2.50,minLegs:2,maxLegs:3,minP:0.75,minEV:-0.02,minTicketEV:-0.03,
+    ok:()=>true}
+};
+const NODE_CAP=3000000;
+function searchTicket(items,T,perMatch){
+  const pool=[];
+  for(const it of items){
+    if(!it.run||it.run.lowRel)continue; // only matches with usable stats and no big stats-vs-market gap
+    const c=it.run.all.filter(x=>x.o>=CFG.minOdds&&x.p>=T.minP&&x.ev>=T.minEV&&T.ok(x)).sort((a,b)=>b.p-a.p).slice(0,perMatch||3);
+    if(c.length)pool.push({home:it.home,away:it.away,c:c});
+  }
+  let best=null,nodes=0;
+  const dfs=function(i,ch,odds,p){
+    if(ch.length>=T.minLegs&&odds>=T.lo&&odds<=T.hi&&(T.minTicketEV==null||p*odds-1>=T.minTicketEV)){
+      if(!best||p>best.p+1e-12||(Math.abs(p-best.p)<=1e-12&&ch.length<best.legs.length))best={legs:ch.slice(),odds:odds,p:p};
+    }
+    if(ch.length>=T.maxLegs||nodes>NODE_CAP)return;
+    for(let k=i;k<pool.length;k++)for(const c of pool[k].c){
+      nodes++;const no=odds*c.o;if(no>T.hi)continue;
+      ch.push({m:pool[k],c:c});dfs(k+1,ch,no,p*c.p);ch.pop();
+    }
+  };
+  dfs(0,[],1,1);
+  return best;
+}
+function buildTickets(items){
+  const mk=(b,tier)=>b?{tier:tier,label:TYPES[tier].label,odds:b.odds,p:b.p,ev:b.p*b.odds-1,legs:b.legs.map(l=>({h:l.m.home,a:l.m.away,n:l.c.n,o:l.c.o,p:l.c.p,s:l.c.s}))}:null;
+  let left=items;const res={};
+  for(const [key,tier] of [['diamond','Diamond'],['silver','Silver'],['safest','Safest']]){
+    const b=searchTicket(left,TYPES[tier]);res[key]=mk(b,tier);
+    if(b){const used=new Set(b.legs.map(l=>l.m.home+'|'+l.m.away));left=left.filter(it=>!used.has(it.home+'|'+it.away));}
+  }
+  return res;
+}
+const TK_COL={Diamond:'#0891b2',Silver:'#6b7280',Safest:'#16a34a'};
+let lastTickets=[];
+function ticketText(t){return t.tier+' ticket ('+t.label+') @ '+t.odds.toFixed(2)+'\n'+t.legs.map(l=>l.h+' vs '+l.a+' - '+l.n+' @'+l.o.toFixed(2)).join('\n');}
+function copyTicket(i){
+  const t=lastTickets[i];if(!t)return;
+  try{navigator.clipboard.writeText(ticketText(t));const b=document.getElementById('v3cp'+i);if(b)b.textContent='Copied';}catch(e){}
+}
+function ticketsPanel(list){
+  const items=itemsFrom(list);if(items.length<2)return '';
+  const T=buildTickets(items);
+  lastTickets=[T.diamond,T.silver,T.safest].filter(Boolean);
+  let h="<div style='background:var(--s2);border:1.5px solid var(--bd);border-radius:14px;padding:12px 14px;margin-bottom:12px'><div style='font-size:13px;font-weight:800;margin-bottom:2px'>Tickets <span style='font-weight:600;color:var(--dim)'>(v3, unvalidated)</span></div><div style='font-size:11.5px;color:var(--dim);margin-bottom:8px'>One leg per match, only matches with usable stats. Every ticket is 2.20-2.50 odds. Each leg needs a 65%+ chance (Safest 75%+) and a price no worse than -10% expected return. If nothing fits, no ticket is made.</div>";
+  let idx=0;
+  const card=(t,tier)=>{
+    const D=TYPES[tier];
+    const range=D.hi===Infinity?"odds "+D.lo.toFixed(2)+"+":"odds "+D.lo.toFixed(2)+"-"+D.hi.toFixed(2);
+    if(!t)return "<div style='border-top:1px solid var(--bd);padding:8px 0;font-size:12.5px'><b>"+tier+"</b> ("+D.label+", "+range+"): no ticket. Not enough qualifying picks on this slate.</div>";
+    const i=idx++;
+    let c="<div style='border-top:1px solid var(--bd);padding:8px 0'><div style='display:flex;justify-content:space-between;align-items:center'><span><span style='font-size:11px;font-weight:800;color:#fff;background:"+TK_COL[tier]+";border-radius:6px;padding:2px 8px'>"+tier.toUpperCase()+"</span> <span style='font-size:11.5px;color:var(--dim)'>"+D.label+"</span></span><span style='font-size:15px;font-weight:800'>@ "+t.odds.toFixed(2)+"</span></div>";
+    for(const l of t.legs)c+="<div style='display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:3px 0'><span>"+esc(l.h)+" vs "+esc(l.a)+"<br><b>"+esc(l.n)+"</b></span><span style='white-space:nowrap'>@"+l.o.toFixed(2)+" &middot; "+pc(l.p)+"</span></div>";
+    c+="<div style='font-size:11.5px;color:var(--dim);margin-top:4px'>Estimated win chance "+pc(t.p)+" &middot; expected return "+sg(t.ev)+" <button id='v3cp"+i+"' onclick='V3.copyTicket("+i+")' style='margin-left:8px;font-size:11px;padding:2px 8px;border-radius:6px;border:1px solid var(--bd);background:transparent;color:inherit'>Copy</button></div></div>";
+    return c;
+  };
+  h+=card(T.diamond,'Diamond');h+=card(T.silver,'Silver');h+=card(T.safest,'Safest');
+  h+="<div style='font-size:11px;color:var(--dim);border-top:1px solid var(--bd);padding-top:6px'>No ticket is guaranteed to hit. Safest is only the most likely combination on this slate, and its chance is shown. Chances multiply across legs and each extra leg also multiplies the bookmaker margin, so expected return is usually negative. Small stakes only.</div></div>";
+  return h;
+}
+// ---- Ticket tracker (mirrors the v1 slip tracker: one record per day, graded from the log, 1,000 flat stake) ----
+const TK_KEYS=['diamond','silver','safest'];
+const TK_NAME={diamond:'Diamond (full time)',silver:'Silver (Over 1.5)',safest:'Safest'};
+const todayStr=()=>{try{if(typeof __today==='function')return __today();}catch(e){}return new Date().toDateString();};
+function recSig(r){return r.date+'|'+TK_KEYS.map(k=>(r[k]||[]).map(l=>l.h+'|'+l.a+'|'+l.n).join(';')).join('#');}
+function loadRecords(){
+  let raw=[];try{raw=JSON.parse(localStorage.getItem('oo_v3_tickets')||'[]');}catch(e){raw=[];}
+  const out=[],byDate={};
+  for(const r of raw){
+    if(r&&r.tier&&r.legs){ // migrate the older one-ticket-per-row format
+      const k=String(r.tier).toLowerCase();if(TK_KEYS.indexOf(k)<0)continue;
+      const key=r.d||'';let rec=byDate[key];
+      if(!rec){rec={date:key,ts:r.ts||0,diamond:[],silver:[],safest:[]};byDate[key]=rec;out.push(rec);}
+      rec[k]=r.legs.map(l=>({m:l.h+' vs '+l.a,h:l.h,a:l.a,n:l.n,o:l.o,s:l.s}));
+    }else if(r&&r.date!==undefined)out.push(r);
+  }
+  return out;
+}
+function saveRecords(a){try{localStorage.setItem('oo_v3_tickets',JSON.stringify(a.slice(0,400)));}catch(e){}}
+const legsOf=t=>t?t.legs.map(l=>({m:l.h+' vs '+l.a,h:l.h,a:l.a,n:l.n,o:l.o,s:l.s})):[];
+function legInfo(date,leg,log){
+  const e=log.find(x=>(x.date===date||x.kickoffDate===date)&&x.homeTeam===leg.h&&x.awayTeam===leg.a);
+  if(!e)return{r:'pending'};
+  if(__ppVoid(e))return{r:'void',pp:e.pp,cs:e.cs||null};
+  const fs=e.finalScore||((e.picks||[]).find(q=>q.finalScore)||{}).finalScore||null;
+  const m=fs?String(fs).match(/^(\d+)-(\d+)$/):null;
+  if(!m||!leg.s)return{r:'pending',cs:e.cs||null,pp:e.pp||null};
+  const o=outcome(leg.s,+m[1],+m[2]);
+  return{r:o>0?'win':(o===0?'void':'loss'),fs:fs,cs:e.cs||null};
+}
+function ticketStatus(date,legs,log){
+  if(!legs.length)return null;
+  const r=legs.map(l=>legInfo(date,l,log).r);
+  if(r.indexOf('loss')>=0)return 'loss';
+  if(r.every(x=>x==='win'||x==='void')&&r.some(x=>x==='win'))return 'win';
+  return 'pending';
+}
+function saveTicketRecord(T,day){
+  try{
+    const date=day||todayStr(),log=(typeof loadLog==='function')?loadLog():[];
+    const rec={date:date,ts:Date.now(),diamond:legsOf(T.diamond),silver:legsOf(T.silver),safest:legsOf(T.safest)};
+    if(!rec.diamond.length&&!rec.silver.length&&!rec.safest.length)return;
+    const settled=r=>TK_KEYS.some(k=>(r[k]||[]).some(l=>legInfo(r.date,l,log).r!=='pending'));
+    // Same day replaces the earlier record, unless that record already has results (then it is kept as history)
+    const keep=loadRecords().filter(r=>r.date!==date||settled(r));
+    keep.unshift(rec);saveRecords(keep);
+  }catch(e){}
+}
+function exportTickets(){return loadRecords();}
+function restoreTickets(arr){
+  if(!Array.isArray(arr))return;
+  const have=loadRecords(),sigs=new Set(have.map(recSig));
+  for(const r of arr){if(r&&r.date!==undefined&&!sigs.has(recSig(r))){have.push(r);sigs.add(recSig(r));}}
+  saveRecords(have);
+}
+// ---- V3 slips in the slip generator: built from the log (same matches, same Today/Tomorrow window), saved to the V3 tracker ----
+function cardHTML(e){
+  const v=e&&e.v3;if(!v||!v.c)return '';
+  const fs=e.finalScore||((e.picks||[]).find(q=>q.finalScore)||{}).finalScore||null;
+  const m=fs?String(fs).match(/^(\d+)-(\d+)$/):null;
+  const res=(s,stored)=>{if(stored&&stored!=='pending')return stored;if(!m||!s)return 'pending';const o=outcome(s,+m[1],+m[2]);return o>0?'win':(o===0?'void':'loss');};
+  const mark=r=>r==='win'?"<b style='color:#16a34a'>W</b>":r==='loss'?"<b style='color:#dc2626'>L</b>":r==='void'?"<b style='color:#9090a8'>VOID</b>":"<span style='color:#9090a8'>&#x23F3;</span>";
+  const tint=r=>r==='win'?'background:rgba(22,163,74,0.14);border-left:3px solid #16a34a;padding-left:6px;':r==='loss'?'background:rgba(220,38,38,0.12);border-left:3px solid #dc2626;padding-left:6px;':'';
+  let h="<div style='font-size:11.5px;color:var(--dim);margin-bottom:6px'>Expected goals "+v.lh.toFixed(2)+" - "+v.la.toFixed(2)+" ("+(v.lh+v.la).toFixed(2)+" total) &middot; basis: "+esc(v.m)+(v.lm?" &middot; market total "+v.lm.toFixed(2):"")+(v.lr?" &middot; <span style='color:#b45309'>lower reliability</span>":"")+(fs?" &middot; final "+esc(fs):"")+"</div>";
+  const picks=v.c.filter(c=>c.k);
+  if(!picks.length)h+="<div style='font-size:12.5px;font-weight:800;padding:6px 0;border-top:1px solid var(--bd)'>NO PICK <span style='font-weight:500;color:var(--dim)'>(nothing both likely and fairly priced)</span></div>";
+  for(const c of picks){const t=c.t||'CLOSEST';
+    const rr=res(c.s,c.r);h+="<div style='display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--bd);"+tint(rr)+"'><div><span style='font-size:10px;font-weight:800;color:#fff;background:"+TIER_COL[t]+";border-radius:6px;padding:2px 6px'>"+TIER_LABEL[t]+"</span> <b style='font-size:12.5px'>"+esc(c.n)+"</b><div style='font-size:11px;color:var(--dim)'>chance "+pc(c.p)+" &middot; return "+sg(c.e)+"</div></div><div style='text-align:right'><b>@"+c.o.toFixed(2)+"</b><div>"+mark(res(c.s,c.r))+"</div></div></div>";}
+  const all=v.a||v.c;
+  h+="<div onclick=\"var b=this.nextSibling;b.style.display=b.style.display==='none'?'block':'none'\" style='font-size:12px;font-weight:700;cursor:pointer;margin-top:6px'>&#x25BE; Scan all "+all.length+" markets"+(v.a?"":" (older entry: stored picks only)")+"</div><div style='display:none;font-size:11.5px;margin-top:4px;line-height:1.7'>";
+  for(const c of all)h+="<div style='display:flex;justify-content:space-between;"+(m?tint(res(c.s,c.r)):'')+"'><span>"+esc(c.n)+"</span><span>"+pc(c.p)+" &middot; @"+c.o.toFixed(2)+" &middot; "+sg(c.e)+" "+(m?mark(res(c.s,c.r)):'')+"</span></div>";
+  h+="</div>";
+  const pr=picks.map(c=>res(c.s,c.r));const hs=pr.indexOf('loss')>=0?'loss':(pr.length&&pr.every(x=>x==='win'||x==='void')&&pr.indexOf('win')>=0?'win':'');
+  return "<div style='border-top:1px solid var(--bd);padding:8px 12px;"+tint(hs).replace('padding-left:6px;','')+"'><div style='font-size:12.5px;font-weight:800;color:#0d9488'>v3 analysis <span style='font-weight:600;color:var(--dim)'>(shadow, unvalidated)</span></div><div style='margin-top:6px'>"+h+"</div></div>";
+}
+let lastSlipTk=[];
+function slipPanel(day,entries){
+  const seen=new Set(),items=[];
+  for(const e of entries){
+    if(!e.v3||!e.v3.c||!e.homeTeam||!e.awayTeam)continue;
+    const k=e.homeTeam+'|'+e.awayTeam;if(seen.has(k))continue;seen.add(k);
+    items.push({home:e.homeTeam,away:e.awayTeam,run:{lowRel:!!e.v3.lr,all:e.v3.c.map(c=>({n:c.n,o:c.o,p:c.p,ev:c.e,s:c.s}))}});
+  }
+  let h="<div style='background:var(--s2);border:1.5px solid #0d9488;border-radius:14px;padding:12px 14px;margin:14px 0 10px'><div style='font-size:13px;font-weight:800;margin-bottom:2px'>V3 slips <span style='font-weight:600;color:var(--dim)'>(its own picks, shadow, unvalidated)</span></div>";
+  if(items.length<2){return h+"<div style='font-size:12px;color:var(--dim)'>Not enough V3-analysed matches kicking off "+esc(day)+" yet.</div></div>";}
+  const T=buildTickets(items);
+  lastSlipTk=[T.diamond,T.silver,T.safest].filter(Boolean);
+  h+="<div style='font-size:11.5px;color:var(--dim);margin-bottom:6px'>Built from "+items.length+" matches by V3's own probabilities (not v1's picks). Full Time first, then Over 1.5, then Safest from what is left; no shared matches. Saved to the V3 tracker in the Log tab.</div>";
+  const names={Diamond:'V3 &middot; Full Time (1X2)',Silver:'V3 &middot; Over 1.5',Safest:'V3 &middot; Safest (all markets)'};
+  let idx=0;
+  const card=(t,tier)=>{
+    const D=TYPES[tier];
+    if(!t)return "<div style='border-top:1px solid var(--bd);padding:8px 0;font-size:12.5px'><b>"+names[tier]+"</b> (odds "+D.lo.toFixed(2)+"-"+D.hi.toFixed(2)+"): no slip. Not enough qualifying V3 picks on this slate.</div>";
+    idx++;
+    let c="<div style='border-top:1px solid var(--bd);padding:8px 0'><div style='display:flex;justify-content:space-between'><b style='font-size:13px'>"+names[tier]+"</b><b>@"+t.odds.toFixed(2)+"</b></div>";
+    for(const l of t.legs)c+="<div style='display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:3px 0'><span>"+esc(l.h)+" vs "+esc(l.a)+"<br><b>"+esc(l.n)+"</b></span><span style='white-space:nowrap'>@"+l.o.toFixed(2)+" &middot; "+pc(l.p)+"</span></div>";
+    return c+"<div style='font-size:11.5px;color:var(--dim)'>Estimated win chance "+pc(t.p)+" &middot; expected return "+sg(t.ev)+"</div></div>";
+  };
+  h+=card(T.diamond,'Diamond')+card(T.silver,'Silver')+card(T.safest,'Safest');
+  h+="<button class='btn-sm' style='width:100%;padding:10px;margin-top:4px' onclick='V3.copySlipTk()'>&#x1F4CB; Copy V3 slips</button><div id='v3SlipCopyMsg' style='font-size:12px;color:var(--dim)'></div></div>";
+  if(lastSlipTk.length){saveTicketRecord(T,day);try{renderTracker();}catch(e){}}
+  return h;
+}
+function copySlipTk(){
+  const nm=['V3 FULL TIME','V3 OVER 1.5','V3 SAFEST'];
+  const txt=lastSlipTk.map(t=>({Diamond:nm[0],Silver:nm[1],Safest:nm[2]}[t.tier])+' ('+t.odds.toFixed(2)+')\n'+t.legs.map(l=>'- '+l.h+' vs '+l.a+': '+l.n+' @ '+l.o.toFixed(2)).join('\n')).join('\n\n');
+  const m=document.getElementById('v3SlipCopyMsg');
+  try{navigator.clipboard.writeText(txt).then(()=>{if(m)m.textContent='Copied.';});}catch(e){const t=document.createElement('textarea');t.value=txt;document.body.appendChild(t);t.select();try{document.execCommand('copy');}catch(x){}t.remove();if(m)m.textContent='Copied.';}
+}
+let trackOpen=false;
+function toggleTrack(){trackOpen=!trackOpen;renderTracker();}
+function renderTracker(){
+  const el=document.getElementById('v3TicketTrack');if(!el)return;
+  const recs=loadRecords();if(!recs.length){el.innerHTML='';return;}
+  const log=(typeof loadLog==='function')?loadLog():[];
+  const tot={diamond:{w:0,l:0,p:0,net:0},silver:{w:0,l:0,p:0,net:0},safest:{w:0,l:0,p:0,net:0}};
+  const col=st=>st==='win'?'#16a34a':(st==='loss'?'#dc2626':'#9090a8');
+  const legLine=(date,l)=>{const i=legInfo(date,l,log);return "<div style='font-size:11.5px;color:var(--dim);padding-left:8px'>"+esc(l.m)+" &middot; "+esc(l.n)+" @ "+l.o.toFixed(2)+" <span style='color:"+col(i.r)+";font-weight:700'>"+(i.r==='win'?'W':i.r==='loss'?'L':i.r==='void'?('VOID'+(i.pp?' &middot; postponed':'')):(i.pp?'<span style="color:#d97706">&#x23F8; postponed'+(i.pp==='overdue'?'?':'')+'</span>':'&#x23F3;'))+"</span>"+(i.cs?" &middot; predicted "+esc(i.cs):"")+(i.fs?" &middot; <b>actual "+esc(i.fs)+"</b>":"")+"</div>";};
+  const rows=recs.map(r=>{
+    const cell=k=>{
+      const legs=r[k]||[];const st=ticketStatus(r.date,legs,log);if(!st)return '';
+      const live=legs.filter(l=>legInfo(r.date,l,log).r!=='void');
+      const prod=(live.length?live:legs).reduce((m,l)=>m*l.o,1);
+      const t=st==='win'?'w':(st==='loss'?'l':'p');tot[k][t]++;
+      if(st==='win')tot[k].net+=1000*(prod-1);if(st==='loss')tot[k].net-=1000;
+      return "<div style='font-size:12px'><b>"+TK_NAME[k]+"</b> "+prod.toFixed(2)+" <span style='color:"+col(st)+";font-weight:700'>"+(st==='win'?'WIN':st==='loss'?'LOSS':'&#x23F3;'+(legs.some(l=>{const q=legInfo(r.date,l,log);return q.pp&&q.r==='pending';})?' <span style="font-weight:600;color:#d97706;font-size:11px">unsettled &middot; postponed leg</span>':''))+"</span></div>"+legs.map(l=>legLine(r.date,l)).join('');
+    };
+    return "<div style='padding:7px 0;border-top:1px solid var(--bd)'><div style='font-size:11px;color:var(--dim);margin-bottom:2px'>"+esc(r.date)+"</div>"+cell('diamond')+cell('silver')+cell('safest')+"</div>";
+  }).join('');
+  const line=(name,t)=>{const d=t.w+t.l;return "<div><span style='color:var(--dim)'>"+name+"</span><br><b>"+(d?Math.round(100*t.w/d)+'%':'-')+"</b> <span style='color:var(--dim)'>("+t.w+"W-"+t.l+"L"+(t.p?", "+t.p+" open":"")+")"+(d?" &middot; "+(t.net>=0?'+':'')+Math.round(t.net).toLocaleString()+"</span>":"</span>")+"</div>";};
+  const sum=(n,t)=>{const d=t.w+t.l;return n+" "+(d?Math.round(100*t.w/d)+'%':'-')+" ("+t.w+"W-"+t.l+"L"+(t.p?", "+t.p+" open":"")+")";};
+  const summary=sum('Diamond',tot.diamond)+" &middot; "+sum('Silver',tot.silver)+" &middot; "+sum('Safest',tot.safest);
+  el.innerHTML="<div style='background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;margin-bottom:14px;overflow:hidden'><div onclick='V3.toggleTrack()' style='padding:11px 14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px'><div style='min-width:0'><div style='font-size:12.5px;font-weight:700;color:var(--muted)'>&#x1F4C8; v3 ticket tracker (1,000 flat stake)</div>"+(trackOpen?"":"<div style='font-size:11.5px;color:var(--dim);margin-top:3px'>"+summary+"</div>")+"</div><div style='font-size:11px;color:var(--dim)'>"+(trackOpen?'&#x25B4;':'&#x25BE;')+"</div></div>"+(trackOpen?"<div style='padding:0 14px 11px'><div style='display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;margin-bottom:6px'>"+line('Diamond (full time)',tot.diamond)+line('Silver (Over 1.5)',tot.silver)+line('Safest',tot.safest)+"</div>"+rows+"</div>":"")+"</div>";
+}
+function attach(log,outcomes){
+  const today=(typeof __today==='function')?__today():null;
+  for(const o of outcomes){
+    if(!o.v3run)continue;
+    const st=toStore(o.v3run);
+    const e=log.find(x=>x.homeTeam===o.result.homeTeam&&x.awayTeam===o.result.awayTeam&&!x.v3&&(!today||x.date===today));
+    if(e)e.v3=st;
+  }
+}
+return{VER:VER,CFG:CFG,core:{grid:grid,outcome:outcome,probs:probs,fitTotal:fitTotal,fitShare:fitShare,extract:extract,expectedGoals:expectedGoals,run:run,toStore:toStore,gradeEntry:gradeEntry,tierOf:tierOf,ticketStatus:ticketStatus,legInfo:legInfo},
+  cache:CACHE,buildTickets:buildTickets,searchTicket:searchTicket,slipPanel:slipPanel,cardHTML:cardHTML,copySlipTk:copySlipTk,itemsFrom:itemsFrom,ticketsPanel:ticketsPanel,copyTicket:copyTicket,renderTracker:renderTracker,toggleTrack:toggleTrack,exportTickets:exportTickets,restoreTickets:restoreTickets,hasPending:hasPending,grade:gradeEntry,panel:panel,board:board,attach:attach};
+})();
+
+</script>
+<script>
+/* ===== v3 wiring: wraps v1 functions without changing v1 rules ===== */
+(function(){
+  const __ao=analyzeOne;
+  analyzeOne=function(a,b,c,d){
+    const o=__ao(a,b,c,d);
+    try{o.v3run=V3.core.run(o.odds,o.form);if(o.v3run&&V3.cache)V3.cache.set(o.odds,o.v3run);}catch(e){o.v3run=null;}
+    return o;
+  };
+  const __bm=buildMatchHTML;
+  buildMatchHTML=function(result,odds,form){
+    let extra="";
+    try{extra=V3.panel(odds,form,V3.cache?V3.cache.get(odds):null);}catch(e){}
+    return __bm(result,odds,form)+extra;
+  };
+  const __rr=renderResult;
+  renderResult=function(results,skipped){
+    const r=__rr.apply(this,arguments);
+    try{const el=document.getElementById("v3Tickets");if(el)el.innerHTML=V3.ticketsPanel(results);}catch(e){}
+    return r;
+  };
+  const __bs=buildSlips;
+  buildSlips=function(){
+    const r=__bs.apply(this,arguments);   // V2 panel first
+    const out=document.getElementById("slipOut");
+    try{
+      const tg=__slipTarget(),now=Date.now();
+      const ents=loadLog().filter(e=>__entryDay(e)===tg.day&&e.v3&&!(e.kickoffTs&&e.kickoffTs<now));
+      if(out)out.insertAdjacentHTML("beforeend",V3.slipPanel(tg.day,ents));
+    }catch(e){if(out)out.insertAdjacentHTML("beforeend","<div class='error-box'>V3 slip builder failed: "+(e&&e.message||e)+"</div>");}
+    return r;
+  };
+  const __rl=renderLog;
+  renderLog=function(){
+    const r=__rl.apply(this,arguments);
+    try{const el=document.getElementById("v3Board");if(el)el.innerHTML=V3.board();}catch(e){}
+    try{V3.renderTracker();}catch(e){}
+    return r;
+  };
+})();
+</script>
+
+
+<script>
+/* ===== Background tickets: five extra tickets built every day from V3's own probabilities and only TRACKED (never shown in the slip generator).
+   Each one uses a different kind of market, so the results show where it pays to opt in. They appear in the Tracker tab calendars and in the Log tab. ===== */
+const BG=(function(){
+'use strict';
+const KEY='oo_bg_tickets';
+const TYPES=[
+  {k:'k1',name:'Double Chance',lo:2.05,hi:2.50,minLegs:2,maxLegs:4,minP:0.70,minEV:-0.12,ok:c=>c.s.t==='x2'&&['1X','X2','12'].indexOf(c.s.o)>=0},
+  {k:'k2',name:'Unders',lo:2.05,hi:2.50,minLegs:2,maxLegs:4,minP:0.70,minEV:-0.12,ok:c=>c.s.t==='ou'&&c.s.d==='under'},
+  {k:'k3',name:'Handicap / DNB',lo:2.05,hi:2.50,minLegs:2,maxLegs:4,minP:0.70,minEV:-0.12,ok:c=>c.s.t==='hcp'||c.s.t==='dnb'},
+  {k:'k4',name:'Team goals',lo:2.05,hi:2.50,minLegs:2,maxLegs:4,minP:0.68,minEV:-0.12,ok:c=>c.s.t==='tt'||c.s.t==='cs'||c.s.t==='wtn'},
+  {k:'k5',name:'Attack (goals)',lo:2.05,hi:2.50,minLegs:2,maxLegs:4,minP:0.58,minEV:-0.12,ok:c=>(c.s.t==='ou'&&c.s.d==='over'&&c.s.l>=2.5)||(c.s.t==='btts'&&c.s.y===true)||(c.s.t==='tt'&&c.s.d==='over')}
+];
+const fmtD=t=>new Date(t).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+function load(){try{const a=JSON.parse(localStorage.getItem(KEY)||'[]');return Array.isArray(a)?a:[];}catch(e){return [];}}
+function save(a){try{localStorage.setItem(KEY,JSON.stringify(a.slice(0,400)));}catch(e){}}
+const info=(date,l,log)=>V3.core.legInfo(date,l,log).r;
+function build(ents){
+  const seen=new Set(),items=[];
+  for(const e of ents){
+    const k=e.homeTeam+'|'+e.awayTeam;if(seen.has(k)||!e.v3)continue;seen.add(k);
+    const rows=(e.v3.a||e.v3.c||[]).map(c=>({n:c.n,o:c.o,p:c.p,ev:c.e,s:c.s}));
+    items.push({home:e.homeTeam,away:e.awayTeam,run:{lowRel:!!e.v3.lr,all:rows}});
+  }
+  const out={};
+  for(const T of TYPES){
+    // only the 30 matches with the likeliest qualifying market keep the search fast
+    const sub=items.map(it=>{const c=it.run.all.filter(x=>T.ok(x)&&x.o>=1.10&&x.p>=T.minP&&x.ev>=T.minEV);return c.length?{it:it,best:Math.max.apply(null,c.map(x=>x.p))}:null;}).filter(Boolean).sort((a,b)=>b.best-a.best).slice(0,30).map(x=>x.it);
+    const b=sub.length>=2?V3.searchTicket(sub,T,2):null;
+    out[T.k]=b?b.legs.map(l=>({m:l.m.home+' vs '+l.m.away,h:l.m.home,a:l.m.away,n:l.c.n,o:l.c.o,s:l.c.s})):[];
+  }
+  return out;
+}
+function auto(){
+  try{
+    if(typeof loadLog!=='function'||typeof __entryDay!=='function')return;
+    const log=loadLog(),now=Date.now();
+    const days=[0,1,2].map(i=>fmtD(now+i*864e5));
+    let recs=load(),changed=false;
+    for(const day of days){
+      const ents=log.filter(e=>__entryDay(e)===day&&e.v3&&!(e.kickoffTs&&e.kickoffTs<=now));
+      if(ents.length<6)continue;
+      const sig=ents.map(e=>e.homeTeam+'>'+e.awayTeam).sort().join(',');
+      const cur=recs.find(r=>r.date===day);
+      if(cur&&cur.sig===sig)continue;
+      if(cur){ // never rebuild once a match in it has started or a result is in
+        const started=TYPES.some(T=>(cur[T.k]||[]).some(l=>{const e=log.find(x=>x.homeTeam===l.h&&x.awayTeam===l.a&&(x.date===day||x.kickoffDate===day));return (e&&e.kickoffTs&&e.kickoffTs<=now)||info(day,l,log)!=='pending';}));
+        if(started)continue;
+      }
+      const t=build(ents);
+      const rec={date:day,ts:now,sig:sig};TYPES.forEach(T=>{rec[T.k]=t[T.k];});
+      if(!TYPES.some(T=>rec[T.k].length))continue;
+      recs=recs.filter(r=>r.date!==day);recs.unshift(rec);changed=true;
+    }
+    if(changed)save(recs);
+  }catch(e){}
+}
+function status(date,legs,log){return V3.core.ticketStatus(date,legs,log);}
+function renderTracker(){
+  const el=document.getElementById('bgTrack');if(!el)return;
+  const recs=load();if(!recs.length){el.innerHTML='';return;}
+  const log=(typeof loadLog==='function')?loadLog():[];
+  const tot={};TYPES.forEach(T=>tot[T.k]={w:0,l:0,p:0,net:0});
+  const rows=[];
+  for(const r of recs){
+    for(const T of TYPES){
+      const legs=r[T.k]||[];const st=status(r.date,legs,log);if(!st)continue;
+      const live=legs.filter(l=>info(r.date,l,log)!=='void');const prod=(live.length?live:legs).reduce((m,l)=>m*l.o,1);
+      const t=st==='win'?'w':(st==='loss'?'l':'p');tot[T.k][t]++;
+      if(st==='win')tot[T.k].net+=1000*(prod-1);if(st==='loss')tot[T.k].net-=1000;
+    }
+  }
+  const line=T=>{const t=tot[T.k],d=t.w+t.l;return "<div style='display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-top:1px solid var(--bd);font-size:12.5px'><b>"+T.name+"</b><span>"+(d?Math.round(100*t.w/d)+'%':'-')+" <span style='color:var(--dim)'>("+t.w+"W-"+t.l+"L"+(t.p?", "+t.p+" open":"")+")</span>"+(d?" <b style='color:"+(t.net>=0?'#16a34a':'#dc2626')+"'>"+(t.net>=0?'+':'')+Math.round(t.net).toLocaleString()+"</b>":"")+"</span></div>";};
+  el.innerHTML="<div style='background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;margin-bottom:14px;padding:11px 14px'><div style='font-size:12.5px;font-weight:800;margin-bottom:2px'>&#x1F50D; Background tickets <span style='font-weight:600;color:var(--dim)'>(tracked only, 1,000 flat stake)</span></div><div style='font-size:11px;color:var(--dim);margin-bottom:4px'>Five kinds of ticket built every day from V3's picks. Where it pays to opt in shows here once there are results; judge only after about 100 settled tickets of a kind.</div>"+TYPES.map(line).join('')+"</div>";
+}
+function exportRecords(){return load();}
+function restoreRecords(arr){
+  if(!Array.isArray(arr))return;
+  const have=load(),dates=new Set(have.map(r=>r.date));
+  for(const r of arr){if(r&&r.date&&!dates.has(r.date)){have.push(r);dates.add(r.date);}}
+  save(have);
+}
+// wiring: build in the background whenever slips are built, and show the summary under the other trackers
+(function(){
+  const __bs=buildSlips;buildSlips=function(){const r=__bs.apply(this,arguments);try{auto();renderTracker();}catch(e){}return r;};
+  const __rl=renderLog;renderLog=function(){const r=__rl.apply(this,arguments);try{auto();renderTracker();}catch(e){}return r;};
+})();
+return{auto:auto,load:load,types:TYPES,renderTracker:renderTracker,exportRecords:exportRecords,restoreRecords:restoreRecords,status:status};
+})();
+</script>
+
+<script>
+/* ===== Tracker tab: the Betting Calendar, built into the Oracle =====
+   The calendar runs in its own sandboxed frame (so its styles never touch the Oracle) and reads/writes the same
+   browser storage keys as your standalone tracker (bets6_*, bank6_*, start6_*). Days are filled in automatically
+   from the saved slips; Export log / Restore in the Log tab carries the whole tracker. */
+const TK=(function(){
+'use strict';
+const SRC="PCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9ImVuIj4KPGhlYWQ+CjxtZXRhIGNoYXJzZXQ9IlVURi04Ij4KPG1ldGEgbmFtZT0idmlld3BvcnQiIGNvbnRlbnQ9IndpZHRoPWRldmljZS13aWR0aCwgaW5pdGlhbC1zY2FsZT0xLjAiPgo8dGl0bGU+QmV0dGluZyBDYWxlbmRhcjwvdGl0bGU+CjxzdHlsZT4KOnJvb3QgewogIC0tYmc6I2IwYjhjMTsgLS1wYW5lbDojZDhkZmU2OyAtLWNhcmQ6I2UyZThlZTsgLS1saW5lOiNhMGFhYjQ7CiAgLS10ZXh0OiMxYTFmMjY7IC0tbXV0ZWQ6IzVhNjQ3MjsKICAtLWdyZWVuOiMxYTdhNDA7IC0tZ3JlZW4tYmc6I2M4ZjBkODsgLS1ncmVlbi1ib3JkZXI6IzJlY2M3MTsKICAtLXJlZDojYjUyYTFjOyAtLXJlZC1iZzojZmFkNGNmOyAtLXJlZC1ib3JkZXI6I2U3NGMzYzsKICAtLWFjY2VudDojYzA3ODIwOyAtLWFjY2VudC1iZzojZmRmMGQ4OyAtLWFjY2VudC1ib3JkZXI6I2U2YTAzMDsKICAtLWJsdWU6IzFhNWZhODsgLS1ibHVlLWJnOiNkMGU0Zjc7IC0tYmx1ZS1ib3JkZXI6IzM0OThkYjsKICAtLXB1cnBsZTojNmExYThhOyAtLXB1cnBsZS1iZzojZWFkMGY3OyAtLXB1cnBsZS1ib3JkZXI6IzliNTliNjsKICAtLXRlYWw6IzBlN2E2ZTsgLS10ZWFsLWJnOiNjOGYwZWM7IC0tdGVhbC1ib3JkZXI6IzFhYmM5YzsKICAtLXJvc2U6IzhhMWEzYTsgLS1yb3NlLWJnOiNmN2QwZGM7IC0tcm9zZS1ib3JkZXI6I2MwMzkyYjsKfQoqe2JveC1zaXppbmc6Ym9yZGVyLWJveDttYXJnaW46MDtwYWRkaW5nOjA7fQpodG1sLGJvZHl7d2lkdGg6MTAwJTtiYWNrZ3JvdW5kOnZhcigtLWJnKTtjb2xvcjp2YXIoLS10ZXh0KTtmb250LWZhbWlseTotYXBwbGUtc3lzdGVtLEJsaW5rTWFjU3lzdGVtRm9udCwnU2Vnb2UgVUknLFJvYm90byxBcmlhbCxzYW5zLXNlcmlmO292ZXJmbG93LXg6aGlkZGVuO30KLnBhZ2V7bWF4LXdpZHRoOjQ4MHB4O21hcmdpbjowIGF1dG87cGFkZGluZzoxMHB4O30KCi5hcHAtaGVhZGVye2JhY2tncm91bmQ6dmFyKC0tcGFuZWwpO2JvcmRlci1yYWRpdXM6MTRweDtwYWRkaW5nOjEycHggMTZweDtkaXNwbGF5OmZsZXg7YWxpZ24taXRlbXM6Y2VudGVyO2p1c3RpZnktY29udGVudDpzcGFjZS1iZXR3ZWVuO21hcmdpbi1ib3R0b206MTBweDtib3JkZXI6MXB4IHNvbGlkIHZhcigtLWxpbmUpO30KLmFwcC10aXRsZXtmb250LXNpemU6MXJlbTtmb250LXdlaWdodDo3MDA7fQouYXBwLXN1Yntmb250LXNpemU6MC42NXJlbTtjb2xvcjp2YXIoLS1tdXRlZCk7bWFyZ2luLXRvcDoxcHg7fQoubW9udGgtbmF2e2Rpc3BsYXk6ZmxleDthbGlnbi1pdGVtczpjZW50ZXI7Z2FwOjhweDt9Ci5uYXYtYnRue2JhY2tncm91bmQ6dmFyKC0tY2FyZCk7Ym9yZGVyOjFweCBzb2xpZCB2YXIoLS1saW5lKTtjb2xvcjp2YXIoLS10ZXh0KTtib3JkZXItcmFkaXVzOjhweDt3aWR0aDozMHB4O2hlaWdodDozMHB4O2ZvbnQtc2l6ZToxcmVtO2ZvbnQtd2VpZ2h0OjcwMDtjdXJzb3I6cG9pbnRlcjt9Ci5tb250aC1sYWJlbHtmb250LXdlaWdodDo3MDA7Zm9udC1zaXplOjAuODVyZW07bWluLXdpZHRoOjExMHB4O3RleHQtYWxpZ246Y2VudGVyO30KCi8qIEJBQ0tVUC9FWFBPUlQgQkFSICovCi5hY3Rpb24tYmFye2Rpc3BsYXk6ZmxleDtnYXA6NnB4O21hcmdpbi1ib3R0b206MTBweDt9Ci5hY3Rpb24tYnRue2ZsZXg6MTtwYWRkaW5nOjlweCA2cHg7Ym9yZGVyLXJhZGl1czoxMHB4O2JvcmRlcjoxLjVweCBzb2xpZCB2YXIoLS1saW5lKTtiYWNrZ3JvdW5kOnZhcigtLWNhcmQpO2NvbG9yOnZhcigtLW11dGVkKTtmb250LXNpemU6MC43MnJlbTtmb250LXdlaWdodDo3MDA7Y3Vyc29yOnBvaW50ZXI7dGV4dC1hbGlnbjpjZW50ZXI7fQouYWN0aW9uLWJ0bi5iYWNrdXB7Ym9yZGVyLWNvbG9yOnZhcigtLWJsdWUtYm9yZGVyKTtjb2xvcjp2YXIoLS1ibHVlKTtiYWNrZ3JvdW5kOnZhcigtLWJsdWUtYmcpO30KLmFjdGlvbi1idG4uZXhwb3J0e2JvcmRlci1jb2xvcjp2YXIoLS1ncmVlbi1ib3JkZXIpO2NvbG9yOnZhcigtLWdyZWVuKTtiYWNrZ3JvdW5kOnZhcigtLWdyZWVuLWJnKTt9Ci5hY3Rpb24tYnRuLnJlc3RvcmV7Ym9yZGVyLWNvbG9yOnZhcigtLWFjY2VudC1ib3JkZXIpO2NvbG9yOnZhcigtLWFjY2VudCk7YmFja2dyb3VuZDp2YXIoLS1hY2NlbnQtYmcpO30KCi8qIENBTCBUQUJTIOKAlCBzY3JvbGxhYmxlIHJvdyAqLwouY2FsLXRhYnN7ZGlzcGxheTpmbGV4O2dhcDo0cHg7bWFyZ2luLWJvdHRvbTo4cHg7b3ZlcmZsb3cteDphdXRvO3BhZGRpbmctYm90dG9tOjNweDstd2Via2l0LW92ZXJmbG93LXNjcm9sbGluZzp0b3VjaDt9Ci5jYWwtdGFie2ZsZXgtc2hyaW5rOjA7bWluLXdpZHRoOjY4cHg7cGFkZGluZzo4cHggNHB4O2JvcmRlci1yYWRpdXM6MTBweDtib3JkZXI6MnB4IHNvbGlkIHZhcigtLWxpbmUpO2JhY2tncm91bmQ6dmFyKC0tY2FyZCk7Y29sb3I6dmFyKC0tbXV0ZWQpO2ZvbnQtc2l6ZTowLjYycmVtO2ZvbnQtd2VpZ2h0OjcwMDtjdXJzb3I6cG9pbnRlcjt0ZXh0LWFsaWduOmNlbnRlcjtsaW5lLWhlaWdodDoxLjM1O30KLmNhbC10YWIuYWN0aXZlLmMwe2JhY2tncm91bmQ6dmFyKC0tYWNjZW50LWJnKTtib3JkZXItY29sb3I6dmFyKC0tYWNjZW50LWJvcmRlcik7Y29sb3I6dmFyKC0tYWNjZW50KTt9Ci5jYWwtdGFiLmFjdGl2ZS5jMXtiYWNrZ3JvdW5kOnZhcigtLXRlYWwtYmcpO2JvcmRlci1jb2xvcjp2YXIoLS10ZWFsLWJvcmRlcik7Y29sb3I6dmFyKC0tdGVhbCk7fQouY2FsLXRhYi5hY3RpdmUuYzJ7YmFja2dyb3VuZDp2YXIoLS1ibHVlLWJnKTtib3JkZXItY29sb3I6dmFyKC0tYmx1ZS1ib3JkZXIpO2NvbG9yOnZhcigtLWJsdWUpO30KLmNhbC10YWIuYWN0aXZlLmMze2JhY2tncm91bmQ6dmFyKC0tcm9zZS1iZyk7Ym9yZGVyLWNvbG9yOnZhcigtLXJvc2UtYm9yZGVyKTtjb2xvcjp2YXIoLS1yb3NlKTt9Ci5jYWwtdGFiLmFjdGl2ZS5jNHtiYWNrZ3JvdW5kOnZhcigtLWdyZWVuLWJnKTtib3JkZXItY29sb3I6dmFyKC0tZ3JlZW4tYm9yZGVyKTtjb2xvcjp2YXIoLS1ncmVlbik7fQouY2FsLXRhYi5hY3RpdmUuYzV7YmFja2dyb3VuZDp2YXIoLS1wdXJwbGUtYmcpO2JvcmRlci1jb2xvcjp2YXIoLS1wdXJwbGUtYm9yZGVyKTtjb2xvcjp2YXIoLS1wdXJwbGUpO30KLmNhbC10YWIuYWN0aXZlLmM2e2JhY2tncm91bmQ6dmFyKC0tdGVhbC1iZyk7Ym9yZGVyLWNvbG9yOnZhcigtLXRlYWwtYm9yZGVyKTtjb2xvcjp2YXIoLS10ZWFsKTt9Ci5jYWwtdGFiLmFjdGl2ZS5jN3tiYWNrZ3JvdW5kOnZhcigtLXJvc2UtYmcpO2JvcmRlci1jb2xvcjp2YXIoLS1yb3NlLWJvcmRlcik7Y29sb3I6dmFyKC0tcm9zZSk7fQouY2FsLXRhYi5hY3RpdmUuYzh7YmFja2dyb3VuZDp2YXIoLS1ncmVlbi1iZyk7Ym9yZGVyLWNvbG9yOnZhcigtLWdyZWVuLWJvcmRlcik7Y29sb3I6dmFyKC0tZ3JlZW4pO30KLmNhbC10YWIuYWN0aXZlLmM5e2JhY2tncm91bmQ6dmFyKC0tYmx1ZS1iZyk7Ym9yZGVyLWNvbG9yOnZhcigtLWJsdWUtYm9yZGVyKTtjb2xvcjp2YXIoLS1ibHVlKTt9Ci5jYWwtdGFiLmFjdGl2ZS5jMTB7YmFja2dyb3VuZDp2YXIoLS1hY2NlbnQtYmcpO2JvcmRlci1jb2xvcjp2YXIoLS1hY2NlbnQtYm9yZGVyKTtjb2xvcjp2YXIoLS1hY2NlbnQpO30KLmNhbC10YWIuYWN0aXZlLmMxMXtiYWNrZ3JvdW5kOnZhcigtLXRlYWwtYmcpO2JvcmRlci1jb2xvcjp2YXIoLS10ZWFsLWJvcmRlcik7Y29sb3I6dmFyKC0tdGVhbCk7fQouY2FsLXRhYi5hY3RpdmUuYzEye2JhY2tncm91bmQ6dmFyKC0tcHVycGxlLWJnKTtib3JkZXItY29sb3I6dmFyKC0tcHVycGxlLWJvcmRlcik7Y29sb3I6dmFyKC0tcHVycGxlKTt9Ci5jYWwtdGFiLmFjdGl2ZS5jMTN7YmFja2dyb3VuZDp2YXIoLS1yb3NlLWJnKTtib3JkZXItY29sb3I6dmFyKC0tcm9zZS1ib3JkZXIpO2NvbG9yOnZhcigtLXJvc2UpO30KLmNhbC10YWJ7bWluLXdpZHRoOjc0cHg7fQoKLyogUExBTiBUQUJTICovCi5wbGFuLXRhYnN7ZGlzcGxheTpmbGV4O2dhcDo2cHg7bWFyZ2luLWJvdHRvbToxMHB4O30KLnBsYW4tdGFie2ZsZXg6MTtwYWRkaW5nOjEwcHggNHB4O2JvcmRlci1yYWRpdXM6MTBweDtib3JkZXI6MnB4IHNvbGlkIHZhcigtLWxpbmUpO2JhY2tncm91bmQ6dmFyKC0tY2FyZCk7Y29sb3I6dmFyKC0tbXV0ZWQpO2ZvbnQtc2l6ZTowLjcycmVtO2ZvbnQtd2VpZ2h0OjcwMDtjdXJzb3I6cG9pbnRlcjt0ZXh0LWFsaWduOmNlbnRlcjtsaW5lLWhlaWdodDoxLjM7fQoucGxhbi10YWIuYWN0aXZlLnAxe2JhY2tncm91bmQ6dmFyKC0tYWNjZW50LWJnKTtib3JkZXItY29sb3I6dmFyKC0tYWNjZW50LWJvcmRlcik7Y29sb3I6dmFyKC0tYWNjZW50KTt9Ci5wbGFuLXRhYi5hY3RpdmUucDJ7YmFja2dyb3VuZDp2YXIoLS1ibHVlLWJnKTtib3JkZXItY29sb3I6dmFyKC0tYmx1ZS1ib3JkZXIpO2NvbG9yOnZhcigtLWJsdWUpO30KLnBsYW4tdGFiLmFjdGl2ZS5wM3tiYWNrZ3JvdW5kOnZhcigtLXB1cnBsZS1iZyk7Ym9yZGVyLWNvbG9yOnZhcigtLXB1cnBsZS1ib3JkZXIpO2NvbG9yOnZhcigtLXB1cnBsZSk7fQoKLnN0YXQtcm93e2Rpc3BsYXk6ZmxleDtnYXA6NnB4O21hcmdpbi1ib3R0b206MTBweDt9Ci5zdGF0LWNhcmR7ZmxleDoxO2JhY2tncm91bmQ6dmFyKC0tY2FyZCk7Ym9yZGVyOjFweCBzb2xpZCB2YXIoLS1saW5lKTtib3JkZXItcmFkaXVzOjEwcHg7cGFkZGluZzo4cHggNHB4O3RleHQtYWxpZ246Y2VudGVyO30KLnN0YXQtbGFiZWx7Zm9udC1zaXplOjAuNTVyZW07Y29sb3I6dmFyKC0tbXV0ZWQpO3RleHQtdHJhbnNmb3JtOnVwcGVyY2FzZTtsZXR0ZXItc3BhY2luZzowLjA0ZW07fQouc3RhdC12YWx1ZXtmb250LXNpemU6MC45cmVtO2ZvbnQtd2VpZ2h0OjgwMDttYXJnaW4tdG9wOjJweDt9Ci5zdGF0LXZhbHVlLnBvc3tjb2xvcjp2YXIoLS1ncmVlbik7fQouc3RhdC12YWx1ZS5uZWd7Y29sb3I6dmFyKC0tcmVkKTt9Ci5zdGF0LXZhbHVlLmFjY3tjb2xvcjp2YXIoLS1hY2NlbnQpO30KCi5iYW5rLWJhcntib3JkZXItcmFkaXVzOjEwcHg7cGFkZGluZzoxMHB4IDE0cHg7bWFyZ2luLWJvdHRvbToxMHB4O2Rpc3BsYXk6ZmxleDthbGlnbi1pdGVtczpmbGV4LXN0YXJ0O2p1c3RpZnktY29udGVudDpzcGFjZS1iZXR3ZWVuO2JvcmRlcjoxcHggc29saWQgdmFyKC0tbGluZSk7fQouYmFuay1iYXIucDF7YmFja2dyb3VuZDp2YXIoLS1hY2NlbnQtYmcpO2JvcmRlci1jb2xvcjp2YXIoLS1hY2NlbnQtYm9yZGVyKTt9Ci5iYW5rLWJhci5wMntiYWNrZ3JvdW5kOnZhcigtLWJsdWUtYmcpO2JvcmRlci1jb2xvcjp2YXIoLS1ibHVlLWJvcmRlcik7fQouYmFuay1iYXIucDN7YmFja2dyb3VuZDp2YXIoLS1wdXJwbGUtYmcpO2JvcmRlci1jb2xvcjp2YXIoLS1wdXJwbGUtYm9yZGVyKTt9Ci5iYW5rLWxlZnQgLmJsLWxhYmVse2ZvbnQtc2l6ZTowLjZyZW07Y29sb3I6dmFyKC0tbXV0ZWQpO3RleHQtdHJhbnNmb3JtOnVwcGVyY2FzZTt9Ci5iYW5rLWxlZnQgLmJsLWFtb3VudHtmb250LXNpemU6MS4zcmVtO2ZvbnQtd2VpZ2h0OjgwMDttYXJnaW4tdG9wOjJweDtjb2xvcjp2YXIoLS1ncmVlbik7fQouYmFuay1sZWZ0IC5ibC1hbW91bnQuemVyb3tjb2xvcjp2YXIoLS1yZWQpO30KLmJhbmstbGVmdCAuYmwtbmV4dHtmb250LXNpemU6MC42NXJlbTtjb2xvcjp2YXIoLS1tdXRlZCk7bWFyZ2luLXRvcDoycHg7fQouYmFuay1sZWZ0IC5ibC1uZXh0IHNwYW57Zm9udC13ZWlnaHQ6NzAwO2NvbG9yOnZhcigtLXRleHQpO30KLmJhbmstcmlnaHR7ZGlzcGxheTpmbGV4O2ZsZXgtZGlyZWN0aW9uOmNvbHVtbjtnYXA6NHB4O2FsaWduLWl0ZW1zOmZsZXgtZW5kO30KLmJhbmstcmlnaHQgaW5wdXR7YmFja2dyb3VuZDp3aGl0ZTtib3JkZXI6MXB4IHNvbGlkIHZhcigtLWxpbmUpO2JvcmRlci1yYWRpdXM6NnB4O3BhZGRpbmc6NXB4IDhweDtmb250LXNpemU6MC44MnJlbTtjb2xvcjp2YXIoLS10ZXh0KTtmb250LXdlaWdodDo3MDA7d2lkdGg6MTEwcHg7dGV4dC1hbGlnbjpyaWdodDt9Ci5iYW5rLXJpZ2h0IGJ1dHRvbntiYWNrZ3JvdW5kOnZhcigtLWFjY2VudCk7Y29sb3I6d2hpdGU7Ym9yZGVyOm5vbmU7Ym9yZGVyLXJhZGl1czo2cHg7cGFkZGluZzo1cHggMTBweDtmb250LXNpemU6MC43NXJlbTtmb250LXdlaWdodDo3MDA7Y3Vyc29yOnBvaW50ZXI7d2lkdGg6MTEwcHg7fQouYmFuay1yaWdodCAucmVzZXQtc21hbGx7YmFja2dyb3VuZDp0cmFuc3BhcmVudDtib3JkZXI6MXB4IHNvbGlkIHZhcigtLXJlZC1ib3JkZXIpO2NvbG9yOnZhcigtLXJlZCk7Ym9yZGVyLXJhZGl1czo2cHg7cGFkZGluZzo0cHggMTBweDtmb250LXNpemU6MC43cmVtO2ZvbnQtd2VpZ2h0OjcwMDtjdXJzb3I6cG9pbnRlcjt3aWR0aDoxMTBweDt9CgouY2FsZW5kYXItY2FyZHtiYWNrZ3JvdW5kOnZhcigtLXBhbmVsKTtib3JkZXI6MXB4IHNvbGlkIHZhcigtLWxpbmUpO2JvcmRlci1yYWRpdXM6MTRweDtwYWRkaW5nOjEwcHg7bWFyZ2luLWJvdHRvbToxMHB4O30KLmRvdy1yb3d7ZGlzcGxheTpncmlkO2dyaWQtdGVtcGxhdGUtY29sdW1uczpyZXBlYXQoNywxZnIpO2dhcDozcHg7bWFyZ2luLWJvdHRvbTo0cHg7fQouZG93e3RleHQtYWxpZ246Y2VudGVyO2ZvbnQtc2l6ZTowLjZyZW07Y29sb3I6dmFyKC0tbXV0ZWQpO2ZvbnQtd2VpZ2h0OjcwMDt0ZXh0LXRyYW5zZm9ybTp1cHBlcmNhc2U7fQouY2FsLWdyaWR7ZGlzcGxheTpncmlkO2dyaWQtdGVtcGxhdGUtY29sdW1uczpyZXBlYXQoNywxZnIpO2dhcDozcHg7fQouZGF5e2FzcGVjdC1yYXRpbzoxO2JvcmRlci1yYWRpdXM6OHB4O2JhY2tncm91bmQ6dmFyKC0tY2FyZCk7Ym9yZGVyOjFweCBzb2xpZCB2YXIoLS1saW5lKTtkaXNwbGF5OmZsZXg7ZmxleC1kaXJlY3Rpb246Y29sdW1uO3BhZGRpbmc6NHB4O2N1cnNvcjpwb2ludGVyO292ZXJmbG93OmhpZGRlbjt9Ci5kYXkuZW1wdHl7YmFja2dyb3VuZDp0cmFuc3BhcmVudDtib3JkZXI6bm9uZTtjdXJzb3I6ZGVmYXVsdDt9Ci5kYXkud2lue2JhY2tncm91bmQ6dmFyKC0tZ3JlZW4tYmcpO2JvcmRlci1jb2xvcjp2YXIoLS1ncmVlbi1ib3JkZXIpO30KLmRheS5sb3Nze2JhY2tncm91bmQ6dmFyKC0tcmVkLWJnKTtib3JkZXItY29sb3I6dmFyKC0tcmVkLWJvcmRlcik7fQouZGF5LnBlbmRpbmd7YmFja2dyb3VuZDp2YXIoLS1hY2NlbnQtYmcpO2JvcmRlci1jb2xvcjp2YXIoLS1hY2NlbnQtYm9yZGVyKTt9Ci5kbnVte2ZvbnQtc2l6ZTowLjY1cmVtO2ZvbnQtd2VpZ2h0OjcwMDtjb2xvcjp2YXIoLS1tdXRlZCk7fQouZGF5LndpbiAuZG51bXtjb2xvcjp2YXIoLS1ncmVlbik7fQouZGF5Lmxvc3MgLmRudW17Y29sb3I6dmFyKC0tcmVkKTt9Ci5kYXkucGVuZGluZyAuZG51bXtjb2xvcjp2YXIoLS1hY2NlbnQpO30KLmRwbHttYXJnaW4tdG9wOmF1dG87Zm9udC1zaXplOjAuNTJyZW07Zm9udC13ZWlnaHQ6ODAwO2xpbmUtaGVpZ2h0OjEuMTt9Ci5kYXkud2luIC5kcGx7Y29sb3I6dmFyKC0tZ3JlZW4pO30KLmRheS5sb3NzIC5kcGx7Y29sb3I6dmFyKC0tcmVkKTt9Ci5kYXkucGVuZGluZyAuZHBse2NvbG9yOnZhcigtLWFjY2VudCk7fQouZHN0YWtle2ZvbnQtc2l6ZTowLjQ4cmVtO2NvbG9yOnZhcigtLW11dGVkKTttYXJnaW4tdG9wOjFweDt9Cgouc3VtbWFyeS1jYXJke2JhY2tncm91bmQ6dmFyKC0tcGFuZWwpO2JvcmRlcjoxcHggc29saWQgdmFyKC0tbGluZSk7Ym9yZGVyLXJhZGl1czoxNHB4O3BhZGRpbmc6MTJweDttYXJnaW4tYm90dG9tOjEwcHg7fQouc2VjdGlvbi10aXRsZXtmb250LXNpemU6MC43MnJlbTtmb250LXdlaWdodDo3MDA7Y29sb3I6dmFyKC0tbXV0ZWQpO3RleHQtdHJhbnNmb3JtOnVwcGVyY2FzZTtsZXR0ZXItc3BhY2luZzowLjA2ZW07bWFyZ2luLWJvdHRvbTo4cHg7fQouc3VtbWFyeS1ncmlke2Rpc3BsYXk6Z3JpZDtncmlkLXRlbXBsYXRlLWNvbHVtbnM6cmVwZWF0KDMsMWZyKTtnYXA6NnB4O21hcmdpbi1ib3R0b206OHB4O30KLnN1bS1pdGVte2JhY2tncm91bmQ6dmFyKC0tY2FyZCk7Ym9yZGVyOjFweCBzb2xpZCB2YXIoLS1saW5lKTtib3JkZXItcmFkaXVzOjlweDtwYWRkaW5nOjhweCA0cHg7dGV4dC1hbGlnbjpjZW50ZXI7fQoucy1sYWJlbHtmb250LXNpemU6MC41NXJlbTtjb2xvcjp2YXIoLS1tdXRlZCk7dGV4dC10cmFuc2Zvcm06dXBwZXJjYXNlO30KLnMtdmFse2ZvbnQtc2l6ZTowLjlyZW07Zm9udC13ZWlnaHQ6ODAwO21hcmdpbi10b3A6MnB4O30KLnMtdmFsLmdyZWVue2NvbG9yOnZhcigtLWdyZWVuKTt9Ci5zLXZhbC5yZWR7Y29sb3I6dmFyKC0tcmVkKTt9Ci5zLXZhbC5nb2xke2NvbG9yOnZhcigtLWFjY2VudCk7fQoud2luLWJhci13cmFwe2JhY2tncm91bmQ6dmFyKC0tcmVkLWJnKTtib3JkZXItcmFkaXVzOjZweDtoZWlnaHQ6OHB4O292ZXJmbG93OmhpZGRlbjt9Ci53aW4tYmFye2hlaWdodDoxMDAlO2JhY2tncm91bmQ6dmFyKC0tZ3JlZW4tYm9yZGVyKTtib3JkZXItcmFkaXVzOjZweDt3aWR0aDowJTt0cmFuc2l0aW9uOndpZHRoIDAuNHM7fQoud2luLWJhci1sYWJlbHtkaXNwbGF5OmZsZXg7anVzdGlmeS1jb250ZW50OnNwYWNlLWJldHdlZW47Zm9udC1zaXplOjAuNnJlbTtjb2xvcjp2YXIoLS1tdXRlZCk7bWFyZ2luLXRvcDozcHg7fQoKLm92ZXJsYXl7cG9zaXRpb246Zml4ZWQ7aW5zZXQ6MDtiYWNrZ3JvdW5kOnJnYmEoMCwwLDAsMC40NSk7ZGlzcGxheTpub25lO2FsaWduLWl0ZW1zOmZsZXgtZW5kO2p1c3RpZnktY29udGVudDpjZW50ZXI7ei1pbmRleDoxMDA7fQoub3ZlcmxheS5vcGVue2Rpc3BsYXk6ZmxleDt9Ci5tb2RhbHtiYWNrZ3JvdW5kOnZhcigtLXBhbmVsKTtib3JkZXItdG9wOjJweCBzb2xpZCB2YXIoLS1saW5lKTtib3JkZXItcmFkaXVzOjE4cHggMThweCAwIDA7d2lkdGg6MTAwJTttYXgtd2lkdGg6NDgwcHg7cGFkZGluZzoxOHB4O3BhZGRpbmctYm90dG9tOjgwcHg7bWF4LWhlaWdodDo4OHZoO292ZXJmbG93LXk6YXV0bzt9Ci5tb2RhbC1kYXRle2ZvbnQtc2l6ZTowLjlyZW07Zm9udC13ZWlnaHQ6NzAwO21hcmdpbi1ib3R0b206NHB4O30KLm1vZGFsLWNhbC10YWd7Zm9udC1zaXplOjAuN3JlbTtmb250LXdlaWdodDo3MDA7cGFkZGluZzozcHggMTBweDtib3JkZXItcmFkaXVzOjk5OXB4O2Rpc3BsYXk6aW5saW5lLWJsb2NrO21hcmdpbi1ib3R0b206MTBweDt9Ci5tb2RhbC1wbGFucy1ub3Rle2ZvbnQtc2l6ZTowLjY4cmVtO2NvbG9yOnZhcigtLW11dGVkKTttYXJnaW4tYm90dG9tOjEycHg7YmFja2dyb3VuZDp2YXIoLS1jYXJkKTtib3JkZXItcmFkaXVzOjhweDtwYWRkaW5nOjZweCAxMHB4O30KLm0tZmllbGR7bWFyZ2luLWJvdHRvbToxMHB4O30KLm0tZmllbGQgbGFiZWx7ZGlzcGxheTpibG9jaztmb250LXNpemU6MC42NXJlbTtjb2xvcjp2YXIoLS1tdXRlZCk7bWFyZ2luLWJvdHRvbTozcHg7dGV4dC10cmFuc2Zvcm06dXBwZXJjYXNlO30KLm0tZmllbGQgaW5wdXQsLm0tZmllbGQgdGV4dGFyZWF7d2lkdGg6MTAwJTtiYWNrZ3JvdW5kOnZhcigtLWNhcmQpO2JvcmRlcjoxcHggc29saWQgdmFyKC0tbGluZSk7Ym9yZGVyLXJhZGl1czo4cHg7cGFkZGluZzo5cHggMTBweDtjb2xvcjp2YXIoLS10ZXh0KTtmb250LXNpemU6MC45cmVtO2ZvbnQtZmFtaWx5OmluaGVyaXQ7fQoubS1maWVsZCB0ZXh0YXJlYXtyZXNpemU6dmVydGljYWw7bWluLWhlaWdodDo0NHB4O30KLnJlc3VsdC10b2dnbGV7ZGlzcGxheTpmbGV4O2dhcDo2cHg7bWFyZ2luLWJvdHRvbTo4cHg7fQoucmVzdWx0LXRvZ2dsZSBidXR0b257ZmxleDoxO3BhZGRpbmc6OXB4O2JvcmRlci1yYWRpdXM6OHB4O2JvcmRlcjoxcHggc29saWQgdmFyKC0tbGluZSk7YmFja2dyb3VuZDp2YXIoLS1jYXJkKTtjb2xvcjp2YXIoLS1tdXRlZCk7Zm9udC1zaXplOjAuOHJlbTtmb250LXdlaWdodDo3MDA7Y3Vyc29yOnBvaW50ZXI7fQoucmVzdWx0LXRvZ2dsZSBidXR0b24uYWN0aXZlLndpbntiYWNrZ3JvdW5kOnZhcigtLWdyZWVuLWJnKTtib3JkZXItY29sb3I6dmFyKC0tZ3JlZW4tYm9yZGVyKTtjb2xvcjp2YXIoLS1ncmVlbik7fQoucmVzdWx0LXRvZ2dsZSBidXR0b24uYWN0aXZlLmxvc3N7YmFja2dyb3VuZDp2YXIoLS1yZWQtYmcpO2JvcmRlci1jb2xvcjp2YXIoLS1yZWQtYm9yZGVyKTtjb2xvcjp2YXIoLS1yZWQpO30KLnJlc3VsdC10b2dnbGUgYnV0dG9uLmFjdGl2ZS5wZW5kaW5ne2JhY2tncm91bmQ6dmFyKC0tYWNjZW50LWJnKTtib3JkZXItY29sb3I6dmFyKC0tYWNjZW50LWJvcmRlcik7Y29sb3I6dmFyKC0tYWNjZW50KTt9Ci5hdXRvLXByb2ZpdHtmb250LXNpemU6MC43MnJlbTtjb2xvcjp2YXIoLS1tdXRlZCk7bWFyZ2luOi0zcHggMCA4cHg7fQouYXV0by1wcm9maXQgc3Bhbntmb250LXdlaWdodDo3MDA7Y29sb3I6dmFyKC0tdGV4dCk7fQoubW9kYWwtYWN0aW9uc3tkaXNwbGF5OmZsZXg7Z2FwOjZweDttYXJnaW4tdG9wOjhweDt9Ci5tb2RhbC1hY3Rpb25zIGJ1dHRvbntmbGV4OjE7cGFkZGluZzoxMXB4O2JvcmRlci1yYWRpdXM6OXB4O2JvcmRlcjpub25lO2ZvbnQtc2l6ZTowLjg1cmVtO2ZvbnQtd2VpZ2h0OjcwMDtjdXJzb3I6cG9pbnRlcjt9Ci5tYnRuLXNhdmV7YmFja2dyb3VuZDp2YXIoLS1hY2NlbnQpO2NvbG9yOndoaXRlO30KLm1idG4tZGVsZXRle2JhY2tncm91bmQ6dHJhbnNwYXJlbnQ7Ym9yZGVyOjFweCBzb2xpZCB2YXIoLS1yZWQtYm9yZGVyKSFpbXBvcnRhbnQ7Y29sb3I6dmFyKC0tcmVkKTt9Ci5tYnRuLWNsb3Nle2JhY2tncm91bmQ6dHJhbnNwYXJlbnQ7Ym9yZGVyOjFweCBzb2xpZCB2YXIoLS1saW5lKSFpbXBvcnRhbnQ7Y29sb3I6dmFyKC0tbXV0ZWQpO30KPC9zdHlsZT4KPC9oZWFkPgo8Ym9keT4KPGRpdiBjbGFzcz0icGFnZSI+CgogIDxkaXYgY2xhc3M9ImFwcC1oZWFkZXIiPgogICAgPGRpdj4KICAgICAgPGRpdiBjbGFzcz0iYXBwLXRpdGxlIj4mIzEyODE5NzsgQmV0dGluZyBDYWxlbmRhcjwvZGl2PgogICAgICA8ZGl2IGNsYXNzPSJhcHAtc3ViIj5UcmFjayAmbWlkZG90OyBBbmFseXNlICZtaWRkb3Q7IEltcHJvdmU8L2Rpdj4KICAgIDwvZGl2PgogICAgPGRpdiBjbGFzcz0ibW9udGgtbmF2Ij4KICAgICAgPGJ1dHRvbiBjbGFzcz0ibmF2LWJ0biIgaWQ9InByZXZCdG4iPiYjODI0OTs8L2J1dHRvbj4KICAgICAgPGRpdiBjbGFzcz0ibW9udGgtbGFiZWwiIGlkPSJtb250aExhYmVsIj48L2Rpdj4KICAgICAgPGJ1dHRvbiBjbGFzcz0ibmF2LWJ0biIgaWQ9Im5leHRCdG4iPiYjODI1MDs8L2J1dHRvbj4KICAgIDwvZGl2PgogIDwvZGl2PgoKICA8IS0tIEJBQ0tVUCAvIEVYUE9SVCAvIFJFU1RPUkUgLS0+CiAgPGRpdiBjbGFzcz0iYWN0aW9uLWJhciI+CiAgICA8YnV0dG9uIGNsYXNzPSJhY3Rpb24tYnRuIGV4cG9ydCIgb25jbGljaz0iZXhwb3J0TW9udGgoKSI+JiMxMjgxOTY7IEV4cG9ydCB0aGlzIG1vbnRoPC9idXR0b24+CiAgICA8ZGl2IHN0eWxlPSJmbGV4OjI7Zm9udC1zaXplOjAuNjJyZW07Y29sb3I6dmFyKC0tbXV0ZWQpO2FsaWduLXNlbGY6Y2VudGVyO2xpbmUtaGVpZ2h0OjEuMyI+QmFja3VwICZhbXA7IHJlc3RvcmU6IHVzZSA8Yj5FeHBvcnQgbG9nPC9iPiBpbiB0aGUgT3JhY2xlJ3MgTG9nIHRhYi4gSXQgaW5jbHVkZXMgdGhpcyB0cmFja2VyLiBWMiBhbmQgVjMgZGF5cyBmaWxsIGluIGJ5IHRoZW1zZWx2ZXMgZnJvbSB0aGUgc2xpcHMuPC9kaXY+CiAgPC9kaXY+CgogIDwhLS0gQ0FMRU5EQVIgVEFCUyAtLT4KICA8ZGl2IGNsYXNzPSJjYWwtdGFicyIgaWQ9ImNhbFRhYnMiPjwvZGl2PgoKICA8IS0tIFBMQU4gVEFCUyAtLT4KICA8ZGl2IGNsYXNzPSJwbGFuLXRhYnMiPgogICAgPGJ1dHRvbiBjbGFzcz0icGxhbi10YWIgYWN0aXZlIHAxIiBvbmNsaWNrPSJzd2l0Y2hQbGFuKDEpIj5QbGFuIDE8YnI+RmxhdCA1SzwvYnV0dG9uPgogICAgPGJ1dHRvbiBjbGFzcz0icGxhbi10YWIgcDIiIG9uY2xpY2s9InN3aXRjaFBsYW4oMikiPlBsYW4gMjxicj5NYXJ0aW5nYWxlIHgyPC9idXR0b24+CiAgICA8YnV0dG9uIGNsYXNzPSJwbGFuLXRhYiBwMyIgb25jbGljaz0ic3dpdGNoUGxhbigzKSI+UGxhbiAzPGJyPk1hcnRpbmdhbGUgeDM8L2J1dHRvbj4KICA8L2Rpdj4KCiAgPGRpdiBjbGFzcz0ic3RhdC1yb3ciPgogICAgPGRpdiBjbGFzcz0ic3RhdC1jYXJkIj48ZGl2IGNsYXNzPSJzdGF0LWxhYmVsIj5CZXRzPC9kaXY+PGRpdiBjbGFzcz0ic3RhdC12YWx1ZSBhY2MiIGlkPSJzVG90YWxCZXRzIj4wPC9kaXY+PC9kaXY+CiAgICA8ZGl2IGNsYXNzPSJzdGF0LWNhcmQiPjxkaXYgY2xhc3M9InN0YXQtbGFiZWwiPlN0YWtlZDwvZGl2PjxkaXYgY2xhc3M9InN0YXQtdmFsdWUiIGlkPSJzVG90YWxTdGFrZSI+MDwvZGl2PjwvZGl2PgogICAgPGRpdiBjbGFzcz0ic3RhdC1jYXJkIj48ZGl2IGNsYXNzPSJzdGF0LWxhYmVsIj5OZXQgUC9MPC9kaXY+PGRpdiBjbGFzcz0ic3RhdC12YWx1ZSIgaWQ9InNOZXRQTCI+KzA8L2Rpdj48L2Rpdj4KICAgIDxkaXYgY2xhc3M9InN0YXQtY2FyZCI+PGRpdiBjbGFzcz0ic3RhdC1sYWJlbCI+V2luICU8L2Rpdj48ZGl2IGNsYXNzPSJzdGF0LXZhbHVlIGFjYyIgaWQ9InNXaW5SYXRlIj4wJTwvZGl2PjwvZGl2PgogIDwvZGl2PgoKICA8ZGl2IGNsYXNzPSJiYW5rLWJhciBwMSIgaWQ9ImJhbmtCYXIiPgogICAgPGRpdiBjbGFzcz0iYmFuay1sZWZ0Ij4KICAgICAgPGRpdiBjbGFzcz0iYmwtbGFiZWwiPkJhbmtyb2xsPC9kaXY+CiAgICAgIDxkaXYgY2xhc3M9ImJsLWFtb3VudCIgaWQ9ImJsQW1vdW50Ij5Ob3Qgc2V0PC9kaXY+CiAgICAgIDxkaXYgY2xhc3M9ImJsLW5leHQiIGlkPSJibE1ldGEiPjwvZGl2PgogICAgICA8ZGl2IHN0eWxlPSJtYXJnaW4tdG9wOjhweDtwYWRkaW5nLXRvcDo4cHg7Ym9yZGVyLXRvcDoxcHggc29saWQgdmFyKC0tbGluZSk7Ij4KICAgICAgICA8ZGl2IGNsYXNzPSJibC1sYWJlbCI+TmV4dCBCZXQgU3Rha2U8L2Rpdj4KICAgICAgICA8ZGl2IGlkPSJuc0Ftb3VudCIgc3R5bGU9ImZvbnQtc2l6ZToxLjRyZW07Zm9udC13ZWlnaHQ6ODAwO21hcmdpbi10b3A6MnB4O2NvbG9yOnZhcigtLWFjY2VudCk7Ij41LDAwMDwvZGl2PgogICAgICAgIDxkaXYgaWQ9Im5zU3RyZWFrIiBzdHlsZT0iZm9udC1zaXplOjAuNjVyZW07Y29sb3I6dmFyKC0tbXV0ZWQpO21hcmdpbi10b3A6MnB4OyI+Rml4ZWQgZmxhdCBzdGFrZSBldmVyeSBiZXQ8L2Rpdj4KICAgICAgPC9kaXY+CiAgICA8L2Rpdj4KICAgIDxkaXYgY2xhc3M9ImJhbmstcmlnaHQiPgogICAgICA8aW5wdXQgdHlwZT0ibnVtYmVyIiBpZD0iYmFua0lucHV0IiBwbGFjZWhvbGRlcj0iZS5nLiA1MDAwMDAiIHN0ZXA9IjAuMDEiPgogICAgICA8YnV0dG9uIG9uY2xpY2s9InNldEJhbmtyb2xsKCkiPlNldCBCYW5rcm9sbDwvYnV0dG9uPgogICAgICA8YnV0dG9uIGNsYXNzPSJyZXNldC1zbWFsbCIgb25jbGljaz0icmVzZXRCYW5rcm9sbCgpIj4mIzEyODQ3MzsgUmVzZXQ8L2J1dHRvbj4KICAgIDwvZGl2PgogIDwvZGl2PgoKICA8ZGl2IGNsYXNzPSJjYWxlbmRhci1jYXJkIj4KICAgIDxkaXYgY2xhc3M9ImRvdy1yb3ciIGlkPSJkb3dSb3ciPjwvZGl2PgogICAgPGRpdiBjbGFzcz0iY2FsLWdyaWQiIGlkPSJjYWxHcmlkIj48L2Rpdj4KICA8L2Rpdj4KCiAgPGRpdiBjbGFzcz0ic3VtbWFyeS1jYXJkIj4KICAgIDxkaXYgY2xhc3M9InNlY3Rpb24tdGl0bGUiIGlkPSJzdW1tYXJ5VGl0bGUiPlN1bW1hcnk8L2Rpdj4KICAgIDxkaXYgY2xhc3M9InN1bW1hcnktZ3JpZCI+CiAgICAgIDxkaXYgY2xhc3M9InN1bS1pdGVtIj48ZGl2IGNsYXNzPSJzLWxhYmVsIj5Xb248L2Rpdj48ZGl2IGNsYXNzPSJzLXZhbCBncmVlbiIgaWQ9Im1Xb24iPjA8L2Rpdj48L2Rpdj4KICAgICAgPGRpdiBjbGFzcz0ic3VtLWl0ZW0iPjxkaXYgY2xhc3M9InMtbGFiZWwiPkxvc3Q8L2Rpdj48ZGl2IGNsYXNzPSJzLXZhbCByZWQiIGlkPSJtTG9zdCI+MDwvZGl2PjwvZGl2PgogICAgICA8ZGl2IGNsYXNzPSJzdW0taXRlbSI+PGRpdiBjbGFzcz0icy1sYWJlbCI+UGVuZGluZzwvZGl2PjxkaXYgY2xhc3M9InMtdmFsIGdvbGQiIGlkPSJtUGVuZGluZyI+MDwvZGl2PjwvZGl2PgogICAgICA8ZGl2IGNsYXNzPSJzdW0taXRlbSI+PGRpdiBjbGFzcz0icy1sYWJlbCI+UHJvZml0PC9kaXY+PGRpdiBjbGFzcz0icy12YWwgZ3JlZW4iIGlkPSJtUHJvZml0Ij4rMDwvZGl2PjwvZGl2PgogICAgICA8ZGl2IGNsYXNzPSJzdW0taXRlbSI+PGRpdiBjbGFzcz0icy1sYWJlbCI+TG9zc2VzPC9kaXY+PGRpdiBjbGFzcz0icy12YWwgcmVkIiBpZD0ibUxvc3MiPjA8L2Rpdj48L2Rpdj4KICAgICAgPGRpdiBjbGFzcz0ic3VtLWl0ZW0iPjxkaXYgY2xhc3M9InMtbGFiZWwiPk5ldDwvZGl2PjxkaXYgY2xhc3M9InMtdmFsIiBpZD0ibU5ldCI+MDwvZGl2PjwvZGl2PgogICAgPC9kaXY+CiAgICA8ZGl2IGNsYXNzPSJ3aW4tYmFyLXdyYXAiPjxkaXYgY2xhc3M9Indpbi1iYXIiIGlkPSJ3aW5CYXIiPjwvZGl2PjwvZGl2PgogICAgPGRpdiBjbGFzcz0id2luLWJhci1sYWJlbCI+PHNwYW4gaWQ9IndiTG9zcyI+TG9zdCAwJTwvc3Bhbj48c3BhbiBpZD0id2JXaW4iPldvbiAwJTwvc3Bhbj48L2Rpdj4KICA8L2Rpdj4KCjwvZGl2PgoKPCEtLSBNT0RBTCAtLT4KPGRpdiBjbGFzcz0ib3ZlcmxheSIgaWQ9Im92ZXJsYXkiPgogIDxkaXYgY2xhc3M9Im1vZGFsIj4KICAgIDxkaXYgY2xhc3M9Im1vZGFsLWRhdGUiIGlkPSJtb2RhbERhdGUiPjwvZGl2PgogICAgPGRpdiBjbGFzcz0ibW9kYWwtY2FsLXRhZyIgaWQ9Im1vZGFsQ2FsVGFnIj48L2Rpdj4KICAgIDxkaXYgY2xhc3M9Im1vZGFsLXBsYW5zLW5vdGUiPiYjOTQzMjsgT25lIGlucHV0IOKAlCBhbGwgMyBwbGFucyBjYWxjdWxhdGUgYXV0b21hdGljYWxseTwvZGl2PgogICAgPGRpdiBjbGFzcz0ibS1maWVsZCI+PGxhYmVsPk9kZHM8L2xhYmVsPjxpbnB1dCB0eXBlPSJudW1iZXIiIGlkPSJvZGRzSW5wdXQiIHN0ZXA9IjAuMDEiIHBsYWNlaG9sZGVyPSJlLmcuIDEuODUiPjwvZGl2PgogICAgPGRpdiBjbGFzcz0icmVzdWx0LXRvZ2dsZSIgaWQ9InJlc3VsdFRvZ2dsZSI+CiAgICAgIDxidXR0b24gZGF0YS1yZXN1bHQ9IndpbiI+V2luPC9idXR0b24+CiAgICAgIDxidXR0b24gZGF0YS1yZXN1bHQ9Imxvc3MiPkxvc3M8L2J1dHRvbj4KICAgICAgPGJ1dHRvbiBkYXRhLXJlc3VsdD0icGVuZGluZyI+UGVuZGluZzwvYnV0dG9uPgogICAgPC9kaXY+CiAgICA8ZGl2IGNsYXNzPSJhdXRvLXByb2ZpdCIgaWQ9ImF1dG9Qcm9maXQiPjwvZGl2PgogICAgPGRpdiBjbGFzcz0iYXV0by1wcm9maXQiIGlkPSJhdXRvTm90ZSIgc3R5bGU9ImNvbG9yOiMwZTdhNmU7Zm9udC13ZWlnaHQ6NzAwIj48L2Rpdj4KICAgIDxkaXYgY2xhc3M9Im0tZmllbGQiPjxsYWJlbD5Ob3RlczwvbGFiZWw+PHRleHRhcmVhIGlkPSJub3Rlc0lucHV0IiBwbGFjZWhvbGRlcj0iTWF0Y2gsIG1hcmtldCwgZXRjLiI+PC90ZXh0YXJlYT48L2Rpdj4KICAgIDxkaXYgY2xhc3M9Im1vZGFsLWFjdGlvbnMiPgogICAgICA8YnV0dG9uIGNsYXNzPSJtYnRuLXNhdmUiIGlkPSJzYXZlQnRuIiBzdHlsZT0iZmxleDoyO2ZvbnQtc2l6ZToxcmVtO3BhZGRpbmc6MTRweDsiPiYjMTI4MTkwOyBTYXZlIEJldDwvYnV0dG9uPgogICAgPC9kaXY+CiAgICA8ZGl2IGNsYXNzPSJtb2RhbC1hY3Rpb25zIiBzdHlsZT0ibWFyZ2luLXRvcDo2cHg7Ij4KICAgICAgPGJ1dHRvbiBjbGFzcz0ibWJ0bi1kZWxldGUiIGlkPSJkZWxldGVCdG4iPiYjMTI4NDY1OyBEZWxldGU8L2J1dHRvbj4KICAgICAgPGJ1dHRvbiBjbGFzcz0ibWJ0bi1jbG9zZSIgaWQ9ImNsb3NlQnRuIj5DbG9zZTwvYnV0dG9uPgogICAgPC9kaXY+CiAgPC9kaXY+CjwvZGl2PgoKPHNjcmlwdD4KdmFyIEJBU0VfU1RBS0UgPSA1MDAwOwoKdmFyIENBTF9OQU1FUyAgPSBbJ1NhZmUgU2xpcCBWMScsJ1NhZmUgU2xpcCBWMicsJ0Z1bGwgVGltZSBWMScsJ0Z1bGwgVGltZSBWMicsJ092ZXIgMS41IFYxJywnT3ZlciAxLjUgVjInLCdTYWZlIFNsaXAgVjMnLCdGdWxsIFRpbWUgVjMnLCdPdmVyIDEuNSBWMycsJ0JHIERvdWJsZSBDaGFuY2UnLCdCRyBVbmRlcnMnLCdCRyBIYW5kaWNhcCAvIEROQicsJ0JHIFRlYW0gZ29hbHMnLCdCRyBBdHRhY2sgKGdvYWxzKSddOwp2YXIgQ0FMX0VNT0pJICA9IFsnJiMxMjg3Mzc7JywnJiMxMjg3Mzc7JywnJiMxMjc5NDI7JywnJiMxMjc5NDI7JywnJiM5OTE3OycsJyYjOTkxNzsnLCcmIzEyODczNzsnLCcmIzEyNzk0MjsnLCcmIzk5MTc7JywnJiMxMjgyNjk7JywnJiMxMjgyNjk7JywnJiMxMjgyNjk7JywnJiMxMjgyNjk7JywnJiMxMjgyNjk7J107CnZhciBDQUxfQ09MT1JTID0gWwogIHtiZzondmFyKC0tYWNjZW50LWJnKScsIGJvcmRlcjondmFyKC0tYWNjZW50LWJvcmRlciknLCBjb2xvcjondmFyKC0tYWNjZW50KSd9LAogIHtiZzondmFyKC0tdGVhbC1iZyknLCAgIGJvcmRlcjondmFyKC0tdGVhbC1ib3JkZXIpJywgICBjb2xvcjondmFyKC0tdGVhbCknfSwKICB7Ymc6J3ZhcigtLWJsdWUtYmcpJywgICBib3JkZXI6J3ZhcigtLWJsdWUtYm9yZGVyKScsICAgY29sb3I6J3ZhcigtLWJsdWUpJ30sCiAge2JnOid2YXIoLS1yb3NlLWJnKScsICAgYm9yZGVyOid2YXIoLS1yb3NlLWJvcmRlciknLCAgIGNvbG9yOid2YXIoLS1yb3NlKSd9LAogIHtiZzondmFyKC0tZ3JlZW4tYmcpJywgIGJvcmRlcjondmFyKC0tZ3JlZW4tYm9yZGVyKScsICBjb2xvcjondmFyKC0tZ3JlZW4pJ30sCiAge2JnOid2YXIoLS1wdXJwbGUtYmcpJywgYm9yZGVyOid2YXIoLS1wdXJwbGUtYm9yZGVyKScsIGNvbG9yOid2YXIoLS1wdXJwbGUpJ30sCiAge2JnOid2YXIoLS10ZWFsLWJnKScsICAgYm9yZGVyOid2YXIoLS10ZWFsLWJvcmRlciknLCAgIGNvbG9yOid2YXIoLS10ZWFsKSd9LAogIHtiZzondmFyKC0tcm9zZS1iZyknLCAgIGJvcmRlcjondmFyKC0tcm9zZS1ib3JkZXIpJywgICBjb2xvcjondmFyKC0tcm9zZSknfSwKICB7Ymc6J3ZhcigtLWdyZWVuLWJnKScsICBib3JkZXI6J3ZhcigtLWdyZWVuLWJvcmRlciknLCAgY29sb3I6J3ZhcigtLWdyZWVuKSd9LAogIHtiZzondmFyKC0tYmx1ZS1iZyknLCAgIGJvcmRlcjondmFyKC0tYmx1ZS1ib3JkZXIpJywgICBjb2xvcjondmFyKC0tYmx1ZSknfSwKICB7Ymc6J3ZhcigtLWFjY2VudC1iZyknLCBib3JkZXI6J3ZhcigtLWFjY2VudC1ib3JkZXIpJywgY29sb3I6J3ZhcigtLWFjY2VudCknfSwKICB7Ymc6J3ZhcigtLXRlYWwtYmcpJywgICBib3JkZXI6J3ZhcigtLXRlYWwtYm9yZGVyKScsICAgY29sb3I6J3ZhcigtLXRlYWwpJ30sCiAge2JnOid2YXIoLS1wdXJwbGUtYmcpJywgYm9yZGVyOid2YXIoLS1wdXJwbGUtYm9yZGVyKScsIGNvbG9yOid2YXIoLS1wdXJwbGUpJ30sCiAge2JnOid2YXIoLS1yb3NlLWJnKScsICAgYm9yZGVyOid2YXIoLS1yb3NlLWJvcmRlciknLCAgIGNvbG9yOid2YXIoLS1yb3NlKSd9Cl07Cgp2YXIgY3VycmVudERhdGUgICAgPSBuZXcgRGF0ZSgpOwp2YXIgY3VycmVudENhbCAgICAgPSAxOwp2YXIgVklTID0gWzEsMyw1LDYsNyw4LDksMTAsMTEsMTIsMTNdOyAgIC8vIFYyIGFuZCBWMyBtYWluIHNsaXBzLCB0aGVuIHRoZSA1IGJhY2tncm91bmQgKHRyYWNrZWQtb25seSkgdGlja2V0cwp2YXIgY3VycmVudFBsYW4gICAgPSAxOwp2YXIgc2VsZWN0ZWRLZXkgICAgPSBudWxsOwp2YXIgc2VsZWN0ZWRSZXN1bHQgPSAncGVuZGluZyc7CgovLyBCdWlsZCBjYWwgdGFicwp2YXIgY2FsVGFic0VsID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2NhbFRhYnMnKTsKQ0FMX05BTUVTLmZvckVhY2goZnVuY3Rpb24obmFtZSxpKXsKICB2YXIgYnRuID0gZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnYnV0dG9uJyk7CiAgaWYoVklTLmluZGV4T2YoaSk8MCkgcmV0dXJuOwogIGJ0bi5zZXRBdHRyaWJ1dGUoJ2RhdGEtY2FsJyxpKTsKICBidG4uY2xhc3NOYW1lID0gJ2NhbC10YWInKyhpPT09MT8nIGFjdGl2ZSBjMSc6JycpOwogIGJ0bi5pbm5lckhUTUwgPSBDQUxfRU1PSklbaV0rJzxicj4nK25hbWU7CiAgYnRuLm9uY2xpY2sgPSAoZnVuY3Rpb24oaWR4KXsgcmV0dXJuIGZ1bmN0aW9uKCl7IHN3aXRjaENhbChpZHgpOyB9OyB9KShpKTsKICBjYWxUYWJzRWwuYXBwZW5kQ2hpbGQoYnRuKTsKfSk7CgovLyBCdWlsZCBET1cgaGVhZGVycwp2YXIgZG93Um93ID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2Rvd1JvdycpOwpbJ1N1bicsJ01vbicsJ1R1ZScsJ1dlZCcsJ1RodScsJ0ZyaScsJ1NhdCddLmZvckVhY2goZnVuY3Rpb24oZCl7CiAgdmFyIGVsPWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2RpdicpOyBlbC5jbGFzc05hbWU9J2Rvdyc7IGVsLnRleHRDb250ZW50PWQ7IGRvd1Jvdy5hcHBlbmRDaGlsZChlbCk7Cn0pOwoKLy8g4pSA4pSAIFNUT1JBR0Ug4pSA4pSACmZ1bmN0aW9uIHBhZChuKXtyZXR1cm4gbi50b1N0cmluZygpLnBhZFN0YXJ0KDIsJzAnKTt9CmZ1bmN0aW9uIGtleUZvcih5LG0sZCl7cmV0dXJuIHkrJy0nK3BhZChtKzEpKyctJytwYWQoZCk7fQpmdW5jdGlvbiBiZXRLZXkoYyxkayl7cmV0dXJuICdiZXRzNl9jJytjKyc6Jytkazt9CmZ1bmN0aW9uIGJhbmtLZXkoYyxwKXtyZXR1cm4gJ2Jhbms2X2MnK2MrJ19wJytwO30KZnVuY3Rpb24gc3RhcnRLZXkoYyxwKXtyZXR1cm4gJ3N0YXJ0Nl9jJytjKydfcCcrcDt9CmZ1bmN0aW9uIGxvYWRFbnRyeShjLGRrKXt2YXIgcj1sb2NhbFN0b3JhZ2UuZ2V0SXRlbShiZXRLZXkoYyxkaykpO3JldHVybiByP0pTT04ucGFyc2Uocik6bnVsbDt9CmZ1bmN0aW9uIHNhdmVFbnRyeShjLGRrLGRhdGEpe2xvY2FsU3RvcmFnZS5zZXRJdGVtKGJldEtleShjLGRrKSxKU09OLnN0cmluZ2lmeShkYXRhKSk7fQpmdW5jdGlvbiBkZWxldGVFbnRyeShjLGRrKXtsb2NhbFN0b3JhZ2UucmVtb3ZlSXRlbShiZXRLZXkoYyxkaykpO30KZnVuY3Rpb24gZ2V0QmFua3JvbGwoYyxwKXt2YXIgcj1sb2NhbFN0b3JhZ2UuZ2V0SXRlbShiYW5rS2V5KGMscCkpO3JldHVybiByIT09bnVsbD9wYXJzZUZsb2F0KHIpOm51bGw7fQpmdW5jdGlvbiBnZXRTdGFydChjLHApe3ZhciByPWxvY2FsU3RvcmFnZS5nZXRJdGVtKHN0YXJ0S2V5KGMscCkpO3JldHVybiByIT09bnVsbD9wYXJzZUZsb2F0KHIpOm51bGw7fQpmdW5jdGlvbiBzdG9yZUJhbmtyb2xsKGMscCx2KXtsb2NhbFN0b3JhZ2Uuc2V0SXRlbShiYW5rS2V5KGMscCkscGFyc2VGbG9hdCh2KS50b0ZpeGVkKDIpKTt9CmZ1bmN0aW9uIHN0b3JlU3RhcnQoYyxwLHYpe2xvY2FsU3RvcmFnZS5zZXRJdGVtKHN0YXJ0S2V5KGMscCkscGFyc2VGbG9hdCh2KS50b0ZpeGVkKDIpKTt9CmZ1bmN0aW9uIGZtdChuKXtyZXR1cm4gcGFyc2VGbG9hdChuKS50b0xvY2FsZVN0cmluZyh1bmRlZmluZWQse21pbmltdW1GcmFjdGlvbkRpZ2l0czoyLG1heGltdW1GcmFjdGlvbkRpZ2l0czoyfSk7fQoKLy8g4pSA4pSAIFNUQUtJTkcg4pSA4pSACmZ1bmN0aW9uIGdldEN1cnJlbnRTdGFrZShjYWwscGxhbix1cFRvS2V5KXsKICB2YXIgc3Rha2U9QkFTRV9TVEFLRSwga2V5cz1bXTsKICBmb3IodmFyIGk9MDtpPGxvY2FsU3RvcmFnZS5sZW5ndGg7aSsrKXsKICAgIHZhciBrPWxvY2FsU3RvcmFnZS5rZXkoaSk7CiAgICBpZihrJiZrLmluZGV4T2YoJ2JldHM2X2MnK2NhbCsnOicpPT09MCkga2V5cy5wdXNoKGsucmVwbGFjZSgnYmV0czZfYycrY2FsKyc6JywnJykpOwogIH0KICBrZXlzLnNvcnQoKTsKICBmb3IodmFyIGo9MDtqPGtleXMubGVuZ3RoO2orKyl7CiAgICB2YXIgZGs9a2V5c1tqXTsKICAgIGlmKHVwVG9LZXkmJmRrPj11cFRvS2V5KSBicmVhazsKICAgIHZhciBlPWxvYWRFbnRyeShjYWwsZGspOwogICAgaWYoIWUpIGNvbnRpbnVlOwogICAgaWYoZS5yZXN1bHQ9PT0nd2luJ3x8ZS5yZXN1bHQ9PT0ncGVuZGluZycpeyBzdGFrZT1CQVNFX1NUQUtFOyB9CiAgICBlbHNlIGlmKGUucmVzdWx0PT09J2xvc3MnKXsKICAgICAgaWYocGxhbj09PTEpIHN0YWtlPUJBU0VfU1RBS0U7CiAgICAgIGVsc2UgaWYocGxhbj09PTIpIHN0YWtlPXN0YWtlKjI7CiAgICAgIGVsc2UgaWYocGxhbj09PTMpIHN0YWtlPXN0YWtlKjM7CiAgICB9CiAgfQogIHJldHVybiBzdGFrZTsKfQpmdW5jdGlvbiBnZXROZXh0U3Rha2UoYyxwKXtyZXR1cm4gZ2V0Q3VycmVudFN0YWtlKGMscCxudWxsKTt9CmZ1bmN0aW9uIGNvbXB1dGVQcm9maXQob2RkcyxzdGFrZSxyZXN1bHQpewogIG9kZHM9cGFyc2VGbG9hdChvZGRzKTtzdGFrZT1wYXJzZUZsb2F0KHN0YWtlKTsKICBpZihyZXN1bHQ9PT0nd2luJykgcmV0dXJuIHBhcnNlRmxvYXQoKChvZGRzKnN0YWtlKS1zdGFrZSkudG9GaXhlZCgyKSk7CiAgaWYocmVzdWx0PT09J2xvc3MnKSByZXR1cm4gLXBhcnNlRmxvYXQoc3Rha2UudG9GaXhlZCgyKSk7CiAgcmV0dXJuIDA7Cn0KCi8vIOKUgOKUgCBCQU5LUk9MTCDilIDilIAKZnVuY3Rpb24gc2V0QmFua3JvbGwoKXsKICB2YXIgdmFsPXBhcnNlRmxvYXQoZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2JhbmtJbnB1dCcpLnZhbHVlKTsKICBpZihpc05hTih2YWwpfHx2YWw8MCl7YWxlcnQoJ0VudGVyIGEgdmFsaWQgYW1vdW50LicpO3JldHVybjt9CiAgc3RvcmVCYW5rcm9sbChjdXJyZW50Q2FsLGN1cnJlbnRQbGFuLHZhbCk7CiAgc3RvcmVTdGFydChjdXJyZW50Q2FsLGN1cnJlbnRQbGFuLHZhbCk7CiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2JhbmtJbnB1dCcpLnZhbHVlPScnOwogIHJlZnJlc2hCYW5rcm9sbERpc3BsYXkoKTsKfQpmdW5jdGlvbiByZXNldEJhbmtyb2xsKCl7CiAgdmFyIHN0YXJ0PWdldFN0YXJ0KGN1cnJlbnRDYWwsY3VycmVudFBsYW4pOwogIGlmKHN0YXJ0PT09bnVsbCl7YWxlcnQoJ05vIHN0YXJ0aW5nIGJhbmtyb2xsIHNldC4nKTtyZXR1cm47fQogIHN0b3JlQmFua3JvbGwoY3VycmVudENhbCxjdXJyZW50UGxhbixzdGFydCk7CiAgcmVmcmVzaEJhbmtyb2xsRGlzcGxheSgpOwp9CmZ1bmN0aW9uIHJlY29tcHV0ZUJhbmtyb2xsKGNhbCxwbGFuKXsKICB2YXIgc3RhcnQ9Z2V0U3RhcnQoY2FsLHBsYW4pOwogIGlmKHN0YXJ0PT09bnVsbCkgcmV0dXJuOwogIHZhciBydW5uaW5nPXN0YXJ0LCBrZXlzPVtdOwogIGZvcih2YXIgaT0wO2k8bG9jYWxTdG9yYWdlLmxlbmd0aDtpKyspewogICAgdmFyIGs9bG9jYWxTdG9yYWdlLmtleShpKTsKICAgIGlmKGsmJmsuaW5kZXhPZignYmV0czZfYycrY2FsKyc6Jyk9PT0wKSBrZXlzLnB1c2goay5yZXBsYWNlKCdiZXRzNl9jJytjYWwrJzonLCcnKSk7CiAgfQogIGtleXMuc29ydCgpOwogIHZhciBzdGFrZT1CQVNFX1NUQUtFOwogIGZvcih2YXIgaj0wO2o8a2V5cy5sZW5ndGg7aisrKXsKICAgIHZhciBlPWxvYWRFbnRyeShjYWwsa2V5c1tqXSk7CiAgICBpZighZXx8ZS5yZXN1bHQ9PT0ncGVuZGluZycpIGNvbnRpbnVlOwogICAgcnVubmluZys9Y29tcHV0ZVByb2ZpdChlLm9kZHMsc3Rha2UsZS5yZXN1bHQpOwogICAgaWYocnVubmluZzwwKSBydW5uaW5nPTA7CiAgICBpZihlLnJlc3VsdD09PSd3aW4nKSBzdGFrZT1CQVNFX1NUQUtFOwogICAgZWxzZSBpZihlLnJlc3VsdD09PSdsb3NzJyl7CiAgICAgIGlmKHBsYW49PT0xKSBzdGFrZT1CQVNFX1NUQUtFOwogICAgICBlbHNlIGlmKHBsYW49PT0yKSBzdGFrZT1zdGFrZSoyOwogICAgICBlbHNlIGlmKHBsYW49PT0zKSBzdGFrZT1zdGFrZSozOwogICAgfQogIH0KICBzdG9yZUJhbmtyb2xsKGNhbCxwbGFuLHJ1bm5pbmcpOwp9CgpmdW5jdGlvbiByZWZyZXNoQmFua3JvbGxEaXNwbGF5KCl7CiAgdmFyIGM9Y3VycmVudENhbCxwPWN1cnJlbnRQbGFuOwogIHZhciBjdXJyZW50PWdldEJhbmtyb2xsKGMscCksc3RhcnQ9Z2V0U3RhcnQoYyxwKTsKICBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnYmFua0JhcicpLmNsYXNzTmFtZT0nYmFuay1iYXIgcCcrcDsKICB2YXIgYW10RWw9ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2JsQW1vdW50Jyk7CiAgaWYoY3VycmVudD09PW51bGwpe2FtdEVsLnRleHRDb250ZW50PSdOb3Qgc2V0JzthbXRFbC5jbGFzc05hbWU9J2JsLWFtb3VudCc7fQogIGVsc2UgaWYoY3VycmVudDw9MCl7YW10RWwudGV4dENvbnRlbnQ9JzAuMDAg4oCUIEFkZCBtb3JlISc7YW10RWwuY2xhc3NOYW1lPSdibC1hbW91bnQgemVybyc7fQogIGVsc2V7YW10RWwudGV4dENvbnRlbnQ9Zm10KGN1cnJlbnQpO2FtdEVsLmNsYXNzTmFtZT0nYmwtYW1vdW50Jzt9CiAgdmFyIG1ldGFFbD1kb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnYmxNZXRhJyk7CiAgaWYoc3RhcnQhPT1udWxsJiZjdXJyZW50IT09bnVsbCl7CiAgICB2YXIgZGlmZj1jdXJyZW50LXN0YXJ0OwogICAgbWV0YUVsLmlubmVySFRNTD0nU3RhcnRlZDogPHNwYW4+JytmbXQoc3RhcnQpKyc8L3NwYW4+IHwgUC9MOiA8c3Bhbj4nKyhkaWZmPj0wPycrJzonJykrZm10KGRpZmYpKyc8L3NwYW4+JzsKICB9IGVsc2UgeyBtZXRhRWwuaW5uZXJIVE1MPScnOyB9CiAgdmFyIG5zPWdldE5leHRTdGFrZShjLHApOwogIHZhciBuc0VsPWRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCduc0Ftb3VudCcpOwogIG5zRWwuc3R5bGUuY29sb3I9cD09PTE/J3ZhcigtLWFjY2VudCknOnA9PT0yPyd2YXIoLS1ibHVlKSc6J3ZhcigtLXB1cnBsZSknOwogIG5zRWwudGV4dENvbnRlbnQ9Zm10KG5zKTsKICB2YXIgc3NFbD1kb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnbnNTdHJlYWsnKTsKICBpZihwPT09MSl7IHNzRWwudGV4dENvbnRlbnQ9J0ZpeGVkIGZsYXQgc3Rha2UgZXZlcnkgYmV0JzsgfQogIGVsc2V7IHNzRWwudGV4dENvbnRlbnQ9bnM9PT1CQVNFX1NUQUtFPydCYXNlIHN0YWtlIOKAlCBubyBhY3RpdmUgbG9zcyBzdHJlYWsnOidMb3NzIHN0cmVhayBhY3RpdmUgKCcrKHA9PT0yPyd4Mic6J3gzJykrJyBNYXJ0aW5nYWxlKSc7IH0KfQoKLy8g4pSA4pSAIFNXSVRDSEVTIOKUgOKUgApmdW5jdGlvbiBzd2l0Y2hDYWwoYyl7CiAgY3VycmVudENhbD1jOwogIHZhciB0YWJzPWRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoJy5jYWwtdGFiJyk7CiAgdGFicy5mb3JFYWNoKGZ1bmN0aW9uKHQpeyB2YXIgaT1wYXJzZUludCh0LmdldEF0dHJpYnV0ZSgnZGF0YS1jYWwnKSwxMCk7IHQuY2xhc3NOYW1lPSdjYWwtdGFiJysoaT09PWM/JyBhY3RpdmUgYycraTonJyk7IH0pOwogIHJlZnJlc2hCYW5rcm9sbERpc3BsYXkoKTsgcmVuZGVyKCk7Cn0KZnVuY3Rpb24gc3dpdGNoUGxhbihwKXsKICBjdXJyZW50UGxhbj1wOwogIHZhciB0YWJzPWRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoJy5wbGFuLXRhYicpOwogIHRhYnNbMF0uY2xhc3NOYW1lPSdwbGFuLXRhYicrKHA9PT0xPycgYWN0aXZlIHAxJzonJyk7CiAgdGFic1sxXS5jbGFzc05hbWU9J3BsYW4tdGFiJysocD09PTI/JyBhY3RpdmUgcDInOicnKTsKICB0YWJzWzJdLmNsYXNzTmFtZT0ncGxhbi10YWInKyhwPT09Mz8nIGFjdGl2ZSBwMyc6JycpOwogIHJlZnJlc2hCYW5rcm9sbERpc3BsYXkoKTsgcmVuZGVyKCk7Cn0KCi8vIOKUgOKUgCBSRU5ERVIg4pSA4pSACmZ1bmN0aW9uIHJlbmRlcigpewogIHZhciB5PWN1cnJlbnREYXRlLmdldEZ1bGxZZWFyKCksbT1jdXJyZW50RGF0ZS5nZXRNb250aCgpLGM9Y3VycmVudENhbCxwPWN1cnJlbnRQbGFuOwogIHZhciBtb250aE5hbWU9Y3VycmVudERhdGUudG9Mb2NhbGVTdHJpbmcoJ2RlZmF1bHQnLHttb250aDonbG9uZycseWVhcjonbnVtZXJpYyd9KTsKICBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnbW9udGhMYWJlbCcpLnRleHRDb250ZW50PW1vbnRoTmFtZTsKICB2YXIgcGxhbk5hbWVzPVsnJywnRmxhdCA1SycsJ01hcnRpbmdhbGUgeDInLCdNYXJ0aW5nYWxlIHgzJ107CiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3N1bW1hcnlUaXRsZScpLnRleHRDb250ZW50PUNBTF9OQU1FU1tjXSsnIOKAlCBQbGFuICcrcCsnICgnK3BsYW5OYW1lc1twXSsnKSDigJQgJyttb250aE5hbWU7CiAgdmFyIGNhbEdyaWQ9ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2NhbEdyaWQnKTsKICBjYWxHcmlkLmlubmVySFRNTD0nJzsKICB2YXIgZmlyc3REYXk9bmV3IERhdGUoeSxtLDEpLmdldERheSgpLGRheXNJbk1vbnRoPW5ldyBEYXRlKHksbSsxLDApLmdldERhdGUoKTsKICB2YXIgd29uPTAsbG9zdD0wLHBlbmRpbmc9MCx0b3RhbFByb2ZpdD0wLHRvdGFsTG9zcz0wLHRvdGFsU3Rha2VkPTA7CiAgZm9yKHZhciBpPTA7aTxmaXJzdERheTtpKyspe3ZhciBlPWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2RpdicpO2UuY2xhc3NOYW1lPSdkYXkgZW1wdHknO2NhbEdyaWQuYXBwZW5kQ2hpbGQoZSk7fQogIGZvcih2YXIgZD0xO2Q8PWRheXNJbk1vbnRoO2QrKyl7CiAgICB2YXIga2V5PWtleUZvcih5LG0sZCksY2VsbD1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCdkaXYnKTsKICAgIGNlbGwuY2xhc3NOYW1lPSdkYXknOwogICAgdmFyIG51bUVsPWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2RpdicpO251bUVsLmNsYXNzTmFtZT0nZG51bSc7bnVtRWwudGV4dENvbnRlbnQ9ZDtjZWxsLmFwcGVuZENoaWxkKG51bUVsKTsKICAgIHZhciBwbEVsPWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2RpdicpO3BsRWwuY2xhc3NOYW1lPSdkcGwnOwogICAgdmFyIHN0RWw9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnZGl2Jyk7c3RFbC5jbGFzc05hbWU9J2RzdGFrZSc7CiAgICB2YXIgZW50cnk9bG9hZEVudHJ5KGMsa2V5KTsKICAgIGlmKGVudHJ5KXsKICAgICAgdmFyIHBsYW5TdGFrZT1nZXRDdXJyZW50U3Rha2UoYyxwLGtleSk7CiAgICAgIHZhciBwcm9maXQ9Y29tcHV0ZVByb2ZpdChlbnRyeS5vZGRzLHBsYW5TdGFrZSxlbnRyeS5yZXN1bHQpOwogICAgICBjZWxsLmNsYXNzTGlzdC5hZGQoZW50cnkucmVzdWx0KTsKICAgICAgaWYoZW50cnkuYXV0byludW1FbC50ZXh0Q29udGVudD1kKycgXHUwMGI3YSc7CiAgICAgIGlmKGVudHJ5LnJlc3VsdD09PSdwZW5kaW5nJyl7cGxFbC50ZXh0Q29udGVudD0nUGVuZGluZyc7c3RFbC50ZXh0Q29udGVudD1mbXQocGxhblN0YWtlKTt9CiAgICAgIGVsc2V7cGxFbC50ZXh0Q29udGVudD0ocHJvZml0Pj0wPycrJzonJykrcHJvZml0LnRvRml4ZWQoMCk7c3RFbC50ZXh0Q29udGVudD0nU3RrOicrcGxhblN0YWtlLnRvTG9jYWxlU3RyaW5nKCk7fQogICAgICB0b3RhbFN0YWtlZCs9cGxhblN0YWtlOwogICAgICBpZihlbnRyeS5yZXN1bHQ9PT0nd2luJyl7d29uKys7dG90YWxQcm9maXQrPXByb2ZpdDt9CiAgICAgIGVsc2UgaWYoZW50cnkucmVzdWx0PT09J2xvc3MnKXtsb3N0Kys7dG90YWxMb3NzKz1wcm9maXQ7fQogICAgICBlbHNle3BlbmRpbmcrKzt9CiAgICB9CiAgICBjZWxsLmFwcGVuZENoaWxkKHBsRWwpO2NlbGwuYXBwZW5kQ2hpbGQoc3RFbCk7CiAgICAoZnVuY3Rpb24oayxlbnQpe2NlbGwuYWRkRXZlbnRMaXN0ZW5lcignY2xpY2snLGZ1bmN0aW9uKCl7b3Blbk1vZGFsKGssZW50KTt9KTt9KShrZXksZW50cnkpOwogICAgY2FsR3JpZC5hcHBlbmRDaGlsZChjZWxsKTsKICB9CiAgdmFyIHRvdGFsQmV0cz13b24rbG9zdCtwZW5kaW5nLG5ldFBMPXRvdGFsUHJvZml0K3RvdGFsTG9zcyx3aW5SYXRlPSh3b24rbG9zdCk+MD9NYXRoLnJvdW5kKCh3b24vKHdvbitsb3N0KSkqMTAwKTowOwogIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdzVG90YWxCZXRzJykudGV4dENvbnRlbnQ9dG90YWxCZXRzOwogIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdzVG90YWxTdGFrZScpLnRleHRDb250ZW50PXRvdGFsU3Rha2VkLnRvTG9jYWxlU3RyaW5nKCk7CiAgdmFyIG5ldEVsPWRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdzTmV0UEwnKTsKICBuZXRFbC50ZXh0Q29udGVudD0obmV0UEw+PTA/JysnOicnKStuZXRQTC50b0ZpeGVkKDApOwogIG5ldEVsLmNsYXNzTmFtZT0nc3RhdC12YWx1ZSAnKyhuZXRQTD4wPydwb3MnOm5ldFBMPDA/J25lZyc6JycpOwogIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdzV2luUmF0ZScpLnRleHRDb250ZW50PXdpblJhdGUrJyUnOwogIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdtV29uJykudGV4dENvbnRlbnQ9d29uOwogIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdtTG9zdCcpLnRleHRDb250ZW50PWxvc3Q7CiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ21QZW5kaW5nJykudGV4dENvbnRlbnQ9cGVuZGluZzsKICBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnbVByb2ZpdCcpLnRleHRDb250ZW50PScrJyt0b3RhbFByb2ZpdC50b0ZpeGVkKDApOwogIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdtTG9zcycpLnRleHRDb250ZW50PXRvdGFsTG9zcy50b0ZpeGVkKDApOwogIHZhciBtTmV0RWw9ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ21OZXQnKTsKICBtTmV0RWwudGV4dENvbnRlbnQ9KG5ldFBMPj0wPycrJzonJykrbmV0UEwudG9GaXhlZCgwKTsKICBtTmV0RWwuY2xhc3NOYW1lPSdzLXZhbCAnKyhuZXRQTD4wPydncmVlbic6bmV0UEw8MD8ncmVkJzonJyk7CiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3dpbkJhcicpLnN0eWxlLndpZHRoPXdpblJhdGUrJyUnOwogIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCd3YldpbicpLnRleHRDb250ZW50PSdXb24gJyt3aW5SYXRlKyclJzsKICBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnd2JMb3NzJykudGV4dENvbnRlbnQ9J0xvc3QgJysoMTAwLXdpblJhdGUpKyclJzsKfQoKLy8g4pSA4pSAIE1PREFMIOKUgOKUgApmdW5jdGlvbiB1cGRhdGVBdXRvUHJvZml0KCl7CiAgdmFyIG9kZHM9cGFyc2VGbG9hdChkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnb2Rkc0lucHV0JykudmFsdWUpOwogIGlmKGlzTmFOKG9kZHMpfHxzZWxlY3RlZFJlc3VsdD09PSdwZW5kaW5nJyl7ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2F1dG9Qcm9maXQnKS50ZXh0Q29udGVudD0nJztyZXR1cm47fQogIHZhciBucz1nZXROZXh0U3Rha2UoY3VycmVudENhbCxjdXJyZW50UGxhbik7CiAgdmFyIHByb2ZpdD1jb21wdXRlUHJvZml0KG9kZHMsbnMsc2VsZWN0ZWRSZXN1bHQpOwogIGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdhdXRvUHJvZml0JykuaW5uZXJIVE1MPSdTdGFrZTogPHNwYW4+JytmbXQobnMpKyc8L3NwYW4+ICZuYnNwO3wmbmJzcDsgUC9MOiA8c3Bhbj4nKyhwcm9maXQ+PTA/JysnOicnKStwcm9maXQudG9GaXhlZCgyKSsnPC9zcGFuPic7Cn0KZnVuY3Rpb24gc2V0UmVzdWx0KHJlc3VsdCl7CiAgc2VsZWN0ZWRSZXN1bHQ9cmVzdWx0OwogIHZhciBidG5zPWRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdyZXN1bHRUb2dnbGUnKS5nZXRFbGVtZW50c0J5VGFnTmFtZSgnYnV0dG9uJyk7CiAgZm9yKHZhciBpPTA7aTxidG5zLmxlbmd0aDtpKyspewogICAgYnRuc1tpXS5jbGFzc0xpc3QucmVtb3ZlKCdhY3RpdmUnLCd3aW4nLCdsb3NzJywncGVuZGluZycpOwogICAgaWYoYnRuc1tpXS5nZXRBdHRyaWJ1dGUoJ2RhdGEtcmVzdWx0Jyk9PT1yZXN1bHQpIGJ0bnNbaV0uY2xhc3NMaXN0LmFkZCgnYWN0aXZlJyxyZXN1bHQpOwogIH0KICB1cGRhdGVBdXRvUHJvZml0KCk7Cn0KZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3Jlc3VsdFRvZ2dsZScpLmFkZEV2ZW50TGlzdGVuZXIoJ2NsaWNrJyxmdW5jdGlvbihlKXsKICB2YXIgYnRuPWUudGFyZ2V0LmNsb3Nlc3QoJ2J1dHRvbicpO2lmKGJ0bikgc2V0UmVzdWx0KGJ0bi5nZXRBdHRyaWJ1dGUoJ2RhdGEtcmVzdWx0JykpOwp9KTsKZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ29kZHNJbnB1dCcpLmFkZEV2ZW50TGlzdGVuZXIoJ2lucHV0Jyx1cGRhdGVBdXRvUHJvZml0KTsKCmZ1bmN0aW9uIG9wZW5Nb2RhbChrZXksZW50cnkpewogIHNlbGVjdGVkS2V5PWtleTsKICB2YXIgcGFydHM9a2V5LnNwbGl0KCctJyk7CiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ21vZGFsRGF0ZScpLnRleHRDb250ZW50PW5ldyBEYXRlKHBhcnRzWzBdLHBhcnRzWzFdLTEscGFydHNbMl0pLnRvTG9jYWxlRGF0ZVN0cmluZygnZGVmYXVsdCcse3dlZWtkYXk6J2xvbmcnLG1vbnRoOidsb25nJyxkYXk6J251bWVyaWMnLHllYXI6J251bWVyaWMnfSk7CiAgdmFyIHRhZz1kb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnbW9kYWxDYWxUYWcnKTsKICB2YXIgY2M9Q0FMX0NPTE9SU1tjdXJyZW50Q2FsXTsKICB0YWcuaW5uZXJIVE1MPUNBTF9FTU9KSVtjdXJyZW50Q2FsXSsnICcrQ0FMX05BTUVTW2N1cnJlbnRDYWxdOwogIHRhZy5zdHlsZS5iYWNrZ3JvdW5kPWNjLmJnO3RhZy5zdHlsZS5ib3JkZXI9JzFweCBzb2xpZCAnK2NjLmJvcmRlcjt0YWcuc3R5bGUuY29sb3I9Y2MuY29sb3I7CiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ29kZHNJbnB1dCcpLnZhbHVlPWVudHJ5P2VudHJ5Lm9kZHM6Jyc7CiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2F1dG9Ob3RlJykudGV4dENvbnRlbnQ9KGVudHJ5JiZlbnRyeS5hdXRvKT8nRmlsbGVkIGF1dG9tYXRpY2FsbHkgZnJvbSB0aGUgc2xpcC4gU2F2aW5nIGhlcmUgbWFrZXMgaXQgbWFudWFsOyBEZWxldGUgbGV0cyBpdCBmaWxsIGluIGFnYWluLic6Jyc7CiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ25vdGVzSW5wdXQnKS52YWx1ZT1lbnRyeT8oZW50cnkubm90ZXN8fCcnKTonJzsKICBzZXRSZXN1bHQoZW50cnk/ZW50cnkucmVzdWx0OidwZW5kaW5nJyk7CiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ292ZXJsYXknKS5jbGFzc0xpc3QuYWRkKCdvcGVuJyk7Cn0KZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2Nsb3NlQnRuJykuYWRkRXZlbnRMaXN0ZW5lcignY2xpY2snLGZ1bmN0aW9uKCl7ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ292ZXJsYXknKS5jbGFzc0xpc3QucmVtb3ZlKCdvcGVuJyk7fSk7CmRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdvdmVybGF5JykuYWRkRXZlbnRMaXN0ZW5lcignY2xpY2snLGZ1bmN0aW9uKGUpe2lmKGUudGFyZ2V0PT09dGhpcyl0aGlzLmNsYXNzTGlzdC5yZW1vdmUoJ29wZW4nKTt9KTsKCmRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdzYXZlQnRuJykuYWRkRXZlbnRMaXN0ZW5lcignY2xpY2snLGZ1bmN0aW9uKCl7CiAgdmFyIG9kZHM9cGFyc2VGbG9hdChkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnb2Rkc0lucHV0JykudmFsdWUpfHwwOwogIHNhdmVFbnRyeShjdXJyZW50Q2FsLHNlbGVjdGVkS2V5LHtvZGRzOm9kZHMscmVzdWx0OnNlbGVjdGVkUmVzdWx0LG5vdGVzOmRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdub3Rlc0lucHV0JykudmFsdWV9KTsKICByZWNvbXB1dGVCYW5rcm9sbChjdXJyZW50Q2FsLDEpO3JlY29tcHV0ZUJhbmtyb2xsKGN1cnJlbnRDYWwsMik7cmVjb21wdXRlQmFua3JvbGwoY3VycmVudENhbCwzKTsKICBkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnb3ZlcmxheScpLmNsYXNzTGlzdC5yZW1vdmUoJ29wZW4nKTsKICByZWZyZXNoQmFua3JvbGxEaXNwbGF5KCk7cmVuZGVyKCk7Cn0pOwpkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnZGVsZXRlQnRuJykuYWRkRXZlbnRMaXN0ZW5lcignY2xpY2snLGZ1bmN0aW9uKCl7CiAgZGVsZXRlRW50cnkoY3VycmVudENhbCxzZWxlY3RlZEtleSk7CiAgcmVjb21wdXRlQmFua3JvbGwoY3VycmVudENhbCwxKTtyZWNvbXB1dGVCYW5rcm9sbChjdXJyZW50Q2FsLDIpO3JlY29tcHV0ZUJhbmtyb2xsKGN1cnJlbnRDYWwsMyk7CiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ292ZXJsYXknKS5jbGFzc0xpc3QucmVtb3ZlKCdvcGVuJyk7CiAgcmVmcmVzaEJhbmtyb2xsRGlzcGxheSgpO3JlbmRlcigpOwp9KTsKZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3ByZXZCdG4nKS5hZGRFdmVudExpc3RlbmVyKCdjbGljaycsZnVuY3Rpb24oKXtjdXJyZW50RGF0ZS5zZXRNb250aChjdXJyZW50RGF0ZS5nZXRNb250aCgpLTEpO3JlbmRlcigpO30pOwpkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnbmV4dEJ0bicpLmFkZEV2ZW50TGlzdGVuZXIoJ2NsaWNrJyxmdW5jdGlvbigpe2N1cnJlbnREYXRlLnNldE1vbnRoKGN1cnJlbnREYXRlLmdldE1vbnRoKCkrMSk7cmVuZGVyKCk7fSk7CgovLyDilIDilIAgQkFDS1VQIC8gRVhQT1JUIC8gUkVTVE9SRSDilIDilIAKZnVuY3Rpb24gYmFja3VwRGF0YSgpewogIHZhciBkYXRhPXt9OwogIGZvcih2YXIgaT0wO2k8bG9jYWxTdG9yYWdlLmxlbmd0aDtpKyspewogICAgdmFyIGs9bG9jYWxTdG9yYWdlLmtleShpKTsKICAgIGlmKGsmJihrLmluZGV4T2YoJ2JldHM2XycpPT09MHx8ay5pbmRleE9mKCdiYW5rNl8nKT09PTB8fGsuaW5kZXhPZignc3RhcnQ2XycpPT09MCkpewogICAgICBkYXRhW2tdPWxvY2FsU3RvcmFnZS5nZXRJdGVtKGspOwogICAgfQogIH0KICB2YXIgYmxvYj1uZXcgQmxvYihbSlNPTi5zdHJpbmdpZnkoZGF0YSxudWxsLDIpXSx7dHlwZTonYXBwbGljYXRpb24vanNvbid9KTsKICB2YXIgdXJsPVVSTC5jcmVhdGVPYmplY3RVUkwoYmxvYik7CiAgdmFyIGE9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnYScpOwogIGEuaHJlZj11cmw7YS5kb3dubG9hZD0nYmV0dGluZy1iYWNrdXAtJytuZXcgRGF0ZSgpLnRvSVNPU3RyaW5nKCkuc2xpY2UoMCwxMCkrJy5qc29uJzsKICBhLmNsaWNrKCk7VVJMLnJldm9rZU9iamVjdFVSTCh1cmwpOwp9CgpmdW5jdGlvbiBleHBvcnRNb250aCgpewogIHZhciB5PWN1cnJlbnREYXRlLmdldEZ1bGxZZWFyKCksbT1jdXJyZW50RGF0ZS5nZXRNb250aCgpLGM9Y3VycmVudENhbCxwPWN1cnJlbnRQbGFuOwogIHZhciBtb250aE5hbWU9Y3VycmVudERhdGUudG9Mb2NhbGVTdHJpbmcoJ2RlZmF1bHQnLHttb250aDonbG9uZycseWVhcjonbnVtZXJpYyd9KTsKICB2YXIgcGxhbk5hbWVzPVsnJywnRmxhdCA1SycsJ01hcnRpbmdhbGUgeDInLCdNYXJ0aW5nYWxlIHgzJ107CiAgdmFyIGxpbmVzPVsnPT09ICcrQ0FMX05BTUVTW2NdKycgfCBQbGFuICcrcCsnICgnK3BsYW5OYW1lc1twXSsnKSB8ICcrbW9udGhOYW1lKycgPT09JywnJ107CiAgdmFyIGRheXNJbk1vbnRoPW5ldyBEYXRlKHksbSsxLDApLmdldERhdGUoKTsKICB2YXIgd29uPTAsbG9zdD0wLHBlbmRpbmc9MCx0b3RhbFByb2ZpdD0wLHRvdGFsTG9zcz0wOwogIGZvcih2YXIgZD0xO2Q8PWRheXNJbk1vbnRoO2QrKyl7CiAgICB2YXIga2V5PWtleUZvcih5LG0sZCk7CiAgICB2YXIgZW50cnk9bG9hZEVudHJ5KGMsa2V5KTsKICAgIGlmKGVudHJ5KXsKICAgICAgdmFyIHN0YWtlPWdldEN1cnJlbnRTdGFrZShjLHAsa2V5KTsKICAgICAgdmFyIHByb2ZpdD1jb21wdXRlUHJvZml0KGVudHJ5Lm9kZHMsc3Rha2UsZW50cnkucmVzdWx0KTsKICAgICAgdmFyIHJlc3VsdEljb249ZW50cnkucmVzdWx0PT09J3dpbic/J+KchSc6ZW50cnkucmVzdWx0PT09J2xvc3MnPyfinYwnOifij7MnOwogICAgICBsaW5lcy5wdXNoKGtleSsnICcrcmVzdWx0SWNvbisnIE9kZHM6JytlbnRyeS5vZGRzKycgU3Rha2U6JytzdGFrZS50b0xvY2FsZVN0cmluZygpKycgUC9MOicrKHByb2ZpdD49MD8nKyc6JycpK3Byb2ZpdC50b0ZpeGVkKDApKyhlbnRyeS5ub3Rlcz8nIHwgJytlbnRyeS5ub3RlczonJykpOwogICAgICBpZihlbnRyeS5yZXN1bHQ9PT0nd2luJyl7d29uKys7dG90YWxQcm9maXQrPXByb2ZpdDt9CiAgICAgIGVsc2UgaWYoZW50cnkucmVzdWx0PT09J2xvc3MnKXtsb3N0Kys7dG90YWxMb3NzKz1wcm9maXQ7fQogICAgICBlbHNle3BlbmRpbmcrKzt9CiAgICB9CiAgfQogIHZhciBuZXQ9dG90YWxQcm9maXQrdG90YWxMb3NzOwogIGxpbmVzLnB1c2goJycpOwogIGxpbmVzLnB1c2goJy0tLSBTdW1tYXJ5IC0tLScpOwogIGxpbmVzLnB1c2goJ1dvbjogJyt3b24rJyB8IExvc3Q6ICcrbG9zdCsnIHwgUGVuZGluZzogJytwZW5kaW5nKTsKICBsaW5lcy5wdXNoKCdQcm9maXQ6ICsnK3RvdGFsUHJvZml0LnRvRml4ZWQoMCkrJyB8IExvc3NlczogJyt0b3RhbExvc3MudG9GaXhlZCgwKSsnIHwgTmV0OiAnKyhuZXQ+PTA/JysnOicnKStuZXQudG9GaXhlZCgwKSk7CiAgbGluZXMucHVzaCgnV2luIFJhdGU6ICcrKCh3b24rbG9zdCk+MD9NYXRoLnJvdW5kKHdvbi8od29uK2xvc3QpKjEwMCk6MCkrJyUnKTsKICB2YXIgYmxvYj1uZXcgQmxvYihbbGluZXMuam9pbignXG4nKV0se3R5cGU6J3RleHQvcGxhaW4nfSk7CiAgdmFyIHVybD1VUkwuY3JlYXRlT2JqZWN0VVJMKGJsb2IpOwogIHZhciBhPWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ2EnKTsKICBhLmhyZWY9dXJsO2EuZG93bmxvYWQ9Q0FMX05BTUVTW2NdLnJlcGxhY2UoLyAvZywnLScpKyctUGxhbicrcCsnLScrbW9udGhOYW1lLnJlcGxhY2UoLyAvZywnLScpKycudHh0JzsKICBhLmNsaWNrKCk7VVJMLnJldm9rZU9iamVjdFVSTCh1cmwpOwp9CgpmdW5jdGlvbiByZXN0b3JlRGF0YShpbnB1dCl7CiAgdmFyIGZpbGU9aW5wdXQuZmlsZXNbMF07CiAgaWYoIWZpbGUpIHJldHVybjsKICB2YXIgcmVhZGVyPW5ldyBGaWxlUmVhZGVyKCk7CiAgcmVhZGVyLm9ubG9hZD1mdW5jdGlvbihlKXsKICAgIHRyeXsKICAgICAgdmFyIGRhdGE9SlNPTi5wYXJzZShlLnRhcmdldC5yZXN1bHQpOwogICAgICB2YXIgY291bnQ9MDsKICAgICAgT2JqZWN0LmtleXMoZGF0YSkuZm9yRWFjaChmdW5jdGlvbihrKXsKICAgICAgICBpZihrLmluZGV4T2YoJ2JldHM2XycpPT09MHx8ay5pbmRleE9mKCdiYW5rNl8nKT09PTB8fGsuaW5kZXhPZignc3RhcnQ2XycpPT09MCl7CiAgICAgICAgICBsb2NhbFN0b3JhZ2Uuc2V0SXRlbShrLGRhdGFba10pO2NvdW50Kys7CiAgICAgICAgfQogICAgICB9KTsKICAgICAgYWxlcnQoJ1Jlc3RvcmVkICcrY291bnQrJyByZWNvcmRzIHN1Y2Nlc3NmdWxseSEnKTsKICAgICAgcmVmcmVzaEJhbmtyb2xsRGlzcGxheSgpO3JlbmRlcigpOwogICAgfWNhdGNoKGVycil7YWxlcnQoJ0ludmFsaWQgYmFja3VwIGZpbGUuJyk7fQogIH07CiAgcmVhZGVyLnJlYWRBc1RleHQoZmlsZSk7CiAgaW5wdXQudmFsdWU9Jyc7Cn0KCnJlZnJlc2hCYW5rcm9sbERpc3BsYXkoKTsKcmVuZGVyKCk7Cjwvc2NyaXB0Pgo8L2JvZHk+CjwvaHRtbD4K";
+let frame=null;
+const NAMES=['Safe Slip V1','Safe Slip V2','Full Time V1','Full Time V2','Over 1.5 V1','Over 1.5 V2','Safe Slip V3','Full Time V3','Over 1.5 V3'];
+const iso=d=>{const x=new Date(d);if(isNaN(x))return null;const p=n=>String(n).padStart(2,'0');return x.getFullYear()+'-'+p(x.getMonth()+1)+'-'+p(x.getDate());};
+const prod=a=>a.reduce((m,l)=>m*(l.odds!=null?l.odds:l.o),1);
+function readEntry(c,k){try{const r=localStorage.getItem('bets6_c'+c+':'+k);return r?JSON.parse(r):null;}catch(e){return null;}}
+function put(c,k,e){try{localStorage.setItem('bets6_c'+c+':'+k,JSON.stringify(e));}catch(x){}}
+let __LG=[];
+function fill(c,date,legs,status){
+  if(!legs||!legs.length)return;
+  const k=iso(date);if(!k)return;
+  const cur=readEntry(c,k);
+  if(cur&&!cur.auto)return;                 // you edited this day yourself: leave it
+  const live=legs.filter(l=>{try{return V3.core.legInfo(date,l,__LG).r!=='void';}catch(e){return true;}});
+  const odds=Math.round(prod(live.length?live:legs)*100)/100;
+  const res=status==='win'||status==='loss'?status:'pending';
+  if(cur&&cur.auto&&cur.odds===odds&&cur.result===res)return;
+  put(c,k,{odds:odds,result:res,notes:'auto from slip',auto:1});
+}
+function sync(){
+  const log=(typeof loadLog==='function')?loadLog():[];
+  __LG=log;
+  const seen={};
+  const once=(c,date,fn)=>{const k=c+'|'+iso(date);if(seen[k])return;seen[k]=1;fn();};
+  // background tickets (calendars 9-13)
+  try{BG.auto();for(const r of BG.load()){BG.types.forEach((T,i)=>{const L=r[T.k]||[];if(L.length)once(9+i,r.date,()=>fill(9+i,r.date,L,BG.status(r.date,L,log)));});}}catch(e){}
+  // V2 and V3 slips
+  [[V2,1,3,5],[V3,6,7,8]].forEach(([E,cSafe,cFull,cO15])=>{
+    try{
+      for(const r of E.exportTickets()){
+        [[cSafe,'safest'],[cFull,'diamond'],[cO15,'silver']].forEach(([c,key])=>{const L=r[key]||[];if(L.length)once(c,r.date,()=>fill(c,r.date,L,E.core.ticketStatus(r.date,L,log)));});
+      }
+    }catch(e){}
+  });
+}
+function build(){
+  const host=document.getElementById('trackerTab');if(!host||frame)return;
+  const bin=atob(SRC),u8=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+  const html=new TextDecoder('utf-8').decode(u8);
+  frame=document.createElement('iframe');
+  frame.style.cssText='width:100%;height:calc(100vh - 150px);min-height:560px;border:0;display:block;background:#b0b8c1';
+  frame.setAttribute('title','Betting Calendar');
+  frame.srcdoc=html;host.appendChild(frame);
+}
+function refresh(){try{const w=frame&&frame.contentWindow;if(w&&w.render){w.refreshBankrollDisplay();w.render();}}catch(e){}}
+function open(){
+  sync();
+  if(!frame){build();frame.onload=refresh;}else refresh();
+}
+function exportData(){
+  const o={};
+  for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&/^(bets6_|bank6_|start6_)/.test(k))o[k]=localStorage.getItem(k);}
+  return o;
+}
+function restoreData(o){
+  if(!o||typeof o!=='object')return 0;let n=0;
+  for(const k of Object.keys(o)){
+    if(!/^(bets6_|bank6_|start6_)/.test(k))continue;
+    const have=localStorage.getItem(k);
+    if(have===null){localStorage.setItem(k,o[k]);n++;continue;}
+    if(k.indexOf('bets6_')===0){   // a day you entered yourself beats an auto-filled one
+      try{const a=JSON.parse(have),b=JSON.parse(o[k]);if(a&&a.auto&&b&&!b.auto){localStorage.setItem(k,o[k]);n++;}}catch(e){}
+    }
+  }
+  try{refresh();}catch(e){}
+  return n;
+}
+return{open:open,sync:sync,exportData:exportData,restoreData:restoreData,names:NAMES};
+})();
+</script>
+<script>
+/* ===== SCORES tab: the correct-score lists, built by the Oracle from the boards you paste, and tracked.
+   Every board that passes through the Oracle (Analyse box or the box on this tab) is read for its full-time correct-score prices.
+   The tip is the SHORTEST-PRICED correct score (never an Over 2.5 call). Everything is stored so it can be graded and counted later. ===== */
+const SL=(function(){
+'use strict';
+const KEY='oo_scorelists',MAXREC=2500;
+const DASH='–';
+const nrm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+const STOP=new Set(['fc','cf','sc','ac','as','ad','cd','ud','afc','club','de','la','el','fk','sk','if','ik','bk','sv','fsv','tsv','the','1907','1913']);
+const toks=s=>nrm(s).split(' ').filter(t=>t&&!STOP.has(t));
+function nameMatch(a,b){
+  const A=toks(a),B=toks(b);if(!A.length||!B.length)return 0;
+  const mark=t=>t.filter(x=>/^(women|ladies|u\d\d|b|ii|reserve|reserves|youth)$/.test(x)).sort().join(',');
+  if(mark(A)!==mark(B))return 0;
+  const sa=new Set(A);let hit=0;for(const t of B)if(sa.has(t))hit++;
+  const r=hit/Math.min(A.length,B.length);return r>=0.6?r:0;
+}
+function load(){try{const a=JSON.parse(localStorage.getItem(KEY)||'[]');return Array.isArray(a)?a:[];}catch(e){return [];}}
+function save(a){
+  a.sort((x,y)=>(y.ts||0)-(x.ts||0));
+  const cut=Date.now()-120*864e5;let b=a.filter(r=>!r.ts||r.ts>cut||r.res);
+  try{localStorage.setItem(KEY,JSON.stringify(b.slice(0,MAXREC)));}catch(e){try{localStorage.setItem(KEY,JSON.stringify(b.slice(0,800)));}catch(e2){}}
+}
+const dayStr=ts=>new Date(ts).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+const dayKey=ts=>{const d=new Date(ts);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+const WD=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const dayLabel=k=>{const p=k.split('-'),d=new Date(+p[0],+p[1]-1,+p[2]);return WD[d.getDay()]+' '+String(+p[2]).padStart(2,'0')+'/'+String(+p[1]).padStart(2,'0');};
+const tm=ts=>{const d=new Date(ts);let h=d.getHours();const m=String(d.getMinutes()).padStart(2,'0'),ap=h>=12?'pm':'am';h=h%12||12;return h+':'+m+' '+ap;};
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// ---- reading one board ----
+function readCS(raw){
+  const L=raw.split('\n').map(x=>x.trim()).filter(x=>x.length);
+  let i=L.findIndex(x=>/^correct score\s*\|\s*full time$/i.test(x));
+  if(i<0)return{has:false};
+  const sc=[];let other=false,ended=false;
+  for(i=i+1;i<L.length;i++){
+    if(L[i].indexOf('|')>=0){ended=true;break;}
+    const m=L[i].match(/^(\d+)-(\d+)$/);
+    if(m&&/^\d+(\.\d+)?$/.test(L[i+1]||'')){sc.push([+m[1],+m[2],parseFloat(L[i+1])]);i++;continue;}
+    if(/^other$/i.test(L[i])&&/^\d+(\.\d+)?$/.test(L[i+1]||'')){other=true;i++;continue;}
+  }
+  const complete=other&&sc.length>=20;
+  return{has:true,sc:sc,complete:complete,ended:ended};
+}
+function readWTN(raw,home,away){
+  const L=raw.split('\n').map(x=>x.trim()).filter(x=>x.length),out={};
+  for(let i=0;i<L.length-2;i++){
+    const m=L[i].match(/^Win To Nil\s*\|\s*(.+?)\s*\|\s*Full Time$/i);
+    if(m&&/^yes$/i.test(L[i+1])&&/^\d+(\.\d+)?$/.test(L[i+2])){
+      const t=m[1];if(nameMatch(t,home)>=0.99||nrm(t)===nrm(home))out.h=parseFloat(L[i+2]);
+      else if(nameMatch(t,away)>=0.99||nrm(t)===nrm(away))out.a=parseFloat(L[i+2]);
+    }
+  }
+  return out;
+}
+const grp=(i,j)=>{if(i===j)return i===1?'D':'O';if((j===0&&i>0)||(i===0&&j>0))return 'W';if((i===2&&j===1)||(i===1&&j===2))return 'S';return 'O';};
+function choose(cs,b){
+  const sc=cs.slice().sort((p,q)=>p[2]-q[2]);
+  const best=sc[0];
+  let tied=sc.filter(s=>Math.abs(s[2]-best[2])<0.0051);
+  let tie=false,pick=best;
+  if(tied.length>1){
+    tie=true;
+    const h=b.home_win,d=b.draw,a=b.away_win;
+    let fav=null;if(h&&d&&a){const mn=Math.min(h,d,a);fav=mn===h?'h':mn===a?'a':'d';}
+    const by=b.btts_yes,bn=b.btts_no,bttsYes=(by&&bn)?(by<bn):null;
+    const ov=b.over_25,un=b.under_25,overLean=(ov&&un)?(ov<un):null;
+    const score=s=>{let v=0;const r=s[0]>s[1]?'h':s[0]<s[1]?'a':'d';if(fav&&r===fav)v+=100;
+      if(bttsYes!==null&&Math.abs((by||0)-(bn||0))>0.08){const both=s[0]>0&&s[1]>0;if(both===bttsYes)v+=10;}
+      const tot=s[0]+s[1];if(overLean!==null)v+=overLean?tot:-tot;return v;};
+    tied.sort((p,q)=>score(q)-score(p));pick=tied[0];
+  }
+  const rest=sc.filter(s=>!(s[0]===pick[0]&&s[1]===pick[1]));
+  const sec=rest[0]||null;
+  return{pick:pick,second:sec,tie:tie};
+}
+const tc=(s)=>s?s[0]+'-'+s[1]:'';
+function makeRec(raw,b){
+  if(!b||!b.homeTeam||!b.awayTeam)return null;
+  const ts=b.kickoffTs||null;
+  const rec={id:nrm(b.homeTeam)+'|'+nrm(b.awayTeam)+'|'+(ts?dayKey(ts):'nokick'),h:b.homeTeam,a:b.awayTeam,ts:ts,day:ts?dayKey(ts):'nokick',seen:Date.now()};
+  if(!ts){rec.drop='nok';return rec;}
+  const cs=readCS(raw);
+  if(!cs.has){rec.drop='nocs';return rec;}
+  if(!cs.complete){rec.drop='cut';return rec;}
+  const c=choose(cs.sc,b);
+  rec.sc=[c.pick[0],c.pick[1]];rec.co=c.pick[2];rec.g=grp(c.pick[0],c.pick[1]);
+  if(c.second){rec.s2=[c.second[0],c.second[1]];rec.c2=c.second[2];}
+  if(c.tie)rec.tie=1;
+  rec.x=[b.home_win||null,b.draw||null,b.away_win||null];
+  rec.bt=[b.btts_yes||null,b.btts_no||null];
+  rec.ov=b.over_25||null;rec.un=b.under_25||null;
+  const w=readWTN(raw,b.homeTeam,b.awayTeam);if(w.h)rec.wh=w.h;if(w.a)rec.wa=w.a;
+  rec.all=cs.sc.map(s=>s[0]+'-'+s[1]+':'+s[2]).join(';');
+  return rec;
+}
+let lastSig=new Map(),seqN=0;
+function reg(raw,b){
+  if(typeof raw!=='string'||raw.length<200||raw.indexOf('Football//')<0)return;
+  const sig=raw.length+'|'+raw.slice(0,60)+'|'+raw.slice(-60);
+  if(lastSig.has(sig))return;lastSig.set(sig,1);if(lastSig.size>3000)lastSig=new Map();
+  const rec=makeRec(raw,b);if(!rec)return;
+  rec.q=Date.now()*1000+(seqN++%1000);
+  const all=load(),i=all.findIndex(r=>r.id===rec.id),now=Date.now();
+  if(i>=0){
+    const old=all[i];
+    if(old.res){return;}                       // graded: never touch
+    if(rec.drop&&!old.drop){return;}           // keep the good board
+    if(!rec.drop&&rec.ts&&now>rec.ts){return;}  // pasted after kick-off: prices may be live, keep the earlier ones
+    rec.q=old.q||rec.q;all[i]=rec;
+  }else{
+    if(!rec.drop&&rec.ts&&now>rec.ts)rec.late=1; // first seen after kick-off: shown, never counted
+    all.push(rec);
+  }
+  save(all);
+}
+function ingest(raw){
+  const blocks=splitMultiMatchOdds(raw,2000);let n=0;
+  for(const blk of blocks){const b=parseOddsBoard(blk);if(b&&b.homeTeam){reg(blk,b);n++;}}
+  return n;
+}
+
+// ---- results ----
+function setRes(rec,hs,as){rec.res=[hs,as];rec.resAt=Date.now();}
+function fromLog(){
+  let log=[];try{log=loadLog();}catch(e){return 0;}
+  const all=load();let n=0;
+  for(const r of all){
+    if(r.res||r.drop)continue;
+    const e=log.find(x=>x.homeTeam===r.h&&x.awayTeam===r.a&&x.finalScore);
+    if(e){const m=String(e.finalScore).match(/^(\d+)-(\d+)$/);if(m){setRes(r,+m[1],+m[2]);n++;}}
+  }
+  if(n)save(all);return n;
+}
+function parseResults(text){
+  const L=String(text||'').split('\n').map(x=>x.trim()).filter(x=>x.length),out=[];
+  const isScore=x=>/^(\d{1,2})\s*[-:]\s*(\d{1,2})$/.test(x);
+  for(let i=0;i<L.length;i++){
+    let m=L[i].match(/^(.+?)\s+(\d{1,2})\s*[-:]\s*(\d{1,2})\s+(.+)$/);
+    if(m&&!/\d\s*-\s*\d\s*$/.test(m[1])){out.push({h:m[1].replace(/^\d{1,2}:\d{2}\s*(am|pm)?,?\s*/i,''),a:m[4],hs:+m[2],as:+m[3]});continue;}
+    m=L[i].match(/^(.+?)\s(?:-|vs\.?|v)\s(.+?)(?:\s*[:|]?\s*(\d{1,2})\s*[-:]\s*(\d{1,2}))?$/i);
+    if(m&&!isScore(L[i])&&!/^\d+\.\d+$/.test(L[i])){
+      let hs=m[3],as=m[4];
+      if(hs==null){for(let k=1;k<=3&&i+k<L.length;k++){if(isScore(L[i+k])){const q=L[i+k].match(/(\d+)\s*[-:]\s*(\d+)/);hs=q[1];as=q[2];break;}if(/\s(-|vs\.?)\s/.test(L[i+k])&&!isScore(L[i+k]))break;}}
+      if(hs!=null)out.push({h:m[1],a:m[2],hs:+hs,as:+as});
+    }
+  }
+  return out;
+}
+function applyResults(list){
+  const all=load();let n=0,miss=0;
+  for(const x of list){
+    let best=null,bs=0;
+    for(const r of all){
+      if(r.drop)continue;
+      const s1=nameMatch(x.h,r.h),s2=nameMatch(x.a,r.a);
+      if(!s1||!s2)continue;
+      const s=s1+s2;if(s>bs||(s===bs&&best&&!r.res&&best.res)){bs=s;best=r;}
+    }
+    if(best){if(!best.res||best.res[0]!==x.hs||best.res[1]!==x.as){setRes(best,x.hs,x.as);n++;}}else miss++;
+  }
+  if(n)save(all);return{n:n,miss:miss};
+}
+async function checkNet(msg){
+  const all=load(),now=Date.now();
+  let log=[];try{log=loadLog();}catch(e){}
+  const ppSet=new Set(log.filter(e=>e.pp).map(e=>e.homeTeam+'|'+e.awayTeam));
+  const todo=all.filter(r=>{const pp=ppSet.has(r.h+'|'+r.a);return !r.drop&&!r.late&&!r.res&&r.ts&&now>r.ts+110*60000&&(r.tries||0)<(pp?40:8)&&(!r.tried||now-r.tried>(pp?24:3)*3600*1000);});
+  let done=0,got=0,idx=0;
+  const one=async r=>{
+    try{
+      const c=new AbortController();const to=setTimeout(()=>c.abort(),15000);
+      const le=log.find(x=>x.homeTeam===r.h&&x.awayTeam===r.a&&x.muUrl);
+      r.tried=Date.now();r.tries=(r.tries||0)+1;
+      let j;try{const res=await fetch('/.netlify/functions/results?home='+encodeURIComponent(r.h)+'&away='+encodeURIComponent(r.a)+(le?'&url='+encodeURIComponent(le.muUrl):''),{signal:c.signal});j=await res.json();}finally{clearTimeout(to);}
+      if(j&&j.ok&&j.finished&&j.hs!=null){setRes(r,+j.hs,+j.as);got++;}
+    }catch(e){}
+    done++;if(msg)msg('Checking... '+done+' of '+todo.length);
+  };
+  const worker=async()=>{while(idx<todo.length){await one(todo[idx++]);}};
+  await Promise.all(Array.from({length:Math.min(6,todo.length)},worker));
+  if(todo.length)save(all);
+  return{asked:todo.length,got:got};
+}
+
+// ---- grading ----
+function sideOf(r){return r.sc[0]>r.sc[1]?'h':r.sc[0]<r.sc[1]?'a':'d';}
+function marks(r){
+  const o=[];const i=r.sc[0],j=r.sc[1],tot=i+j,side=sideOf(r);
+  o.push({m:'cs',odds:r.co,g:r.g});
+  const xo=side==='h'?r.x[0]:side==='d'?r.x[1]:r.x[2];
+  o.push({m:'res',odds:xo||null,g:r.g});
+  if(r.g==='W'){o.push({m:'wtn',odds:side==='h'?(r.wh||null):(r.wa||null),g:r.g});
+    if(Math.max(i,j)>=2)o.push({m:'wtn2',odds:null,g:r.g});}
+  if(tot>=3)o.push({m:'ov',odds:r.ov||null,g:r.g});
+  else if(tot<=1)o.push({m:'un',odds:r.un||null,g:r.g});
+  return o;
+}
+function hit(r,m){
+  const a=r.res[0],b=r.res[1],i=r.sc[0],j=r.sc[1],side=sideOf(r);
+  const fs=a>b?'h':a<b?'a':'d';
+  if(m==='cs')return a===i&&b===j;
+  if(m==='res')return fs===side;
+  if(m==='wtn'){return side==='h'?(a>b&&b===0):(b>a&&a===0);}
+  if(m==='wtn2'){return side==='h'?(a>=2&&b===0):(b>=2&&a===0);}
+  if(m==='ov')return a+b>=3;
+  if(m==='un')return a+b<=2;
+  return false;
+}
+const MNAME={cs:'Exact correct score',res:'Result (side of the tipped score)',wtn:'Win to nil (X–0 tips)',wtn2:'2+ goals to nil (2–0, 3–0 tips)',ov:'Over 2.5 (tipped 3+ goals)',un:'Under 2.5 (tipped 0–1 goals)'};
+const GNAME={W:'Win to nil group',S:'2–1 / 1–2 group',D:'Draw 1–1 group',O:'Other scores'};
+function stats(){
+  const all=load().filter(r=>!r.drop&&!r.late&&r.res&&r.sc);
+  const T={};
+  const add=(k,h,odds)=>{const t=T[k]||(T[k]={n:0,w:0,no:0,pr:0,be:0});t.n++;if(h)t.w++;if(odds){t.no++;t.pr+=h?odds-1:-1;t.be+=1/odds;}};
+  for(const r of all){for(const x of marks(r)){const h=hit(r,x.m);add(x.m,h,x.odds);add(x.m+'|'+x.g,h,x.odds);}}
+  return{T:T,settled:all.length,pending:load().filter(r=>!r.drop&&!r.late&&!r.res&&r.sc).length};
+}
+
+// ---- display ----
+let curDay=null,showStarted=false;
+const eff=day=>{if(showStarted)return true;const b=build(day,false);return b.ok.length===0&&b.started>0;};
+function daysList(){
+  const all=load(),m={};
+  for(const r of all){if(r.day==='nokick')continue;m[r.day]=(m[r.day]||0)+1;}
+  return Object.keys(m).sort().map(k=>({k:k,n:m[k]}));
+}
+function autoDay(){
+  const ds=daysList();if(!ds.length)return null;
+  const t=new Date(),keys=[0,1,2].map(n=>dayKey(new Date(t.getFullYear(),t.getMonth(),t.getDate()+n)));
+  for(const k of keys){const d=ds.find(x=>x.k===k);if(d&&d.n>=10)return k;}
+  return ds[ds.length-1].k;
+}
+function build(day,withStarted){
+  const now=Date.now();
+  const recs=load().filter(r=>r.day===day);
+  const ok=recs.filter(r=>!r.drop&&(withStarted||!(r.ts&&r.ts<=now)));
+  const started=recs.filter(r=>!r.drop&&r.ts&&r.ts<=now).length;
+  const drops=recs.filter(r=>r.drop);
+  const G={W:[],S:[],D:[],O:[]};
+  ok.sort((a,b)=>(a.ts||0)-(b.ts||0)||(a.q||0)-(b.q||0));
+  for(const r of ok)G[r.g].push(r);
+  const line=r=>tm(r.ts)+' '+r.h+' vs '+r.a+': '+r.sc[0]+DASH+r.sc[1];
+  const out={ok:ok,G:G,line:line,drops:drops,started:started,recs:recs};
+  // near-ties and tie-breaks (only between different groups, within 3.1%)
+  out.near=ok.filter(r=>r.s2&&grp(r.s2[0],r.s2[1])!==r.g&&(r.c2-r.co)/r.co<=0.031&&(r.c2-r.co)>0.0051);
+  out.ties=ok.filter(r=>r.tie);
+  const dl=dayLabel(day);
+  const tz=(function(){try{return Intl.DateTimeFormat().resolvedOptions().timeZone==='Africa/Kampala'?'Kampala time':'your local time';}catch(e){return 'your local time';}})();
+  const T=[];
+  T.push('All '+dl+' ('+tz+'). Scores are the shortest-priced full-time correct score on each board, not Over 2.5 calls.');
+  const sect=(t,a)=>{if(!a.length)return;T.push(t+' ('+a.length+')');for(const r of a)T.push(line(r));};
+  sect('Win to nil',G.W);sect('2'+DASH+'1 / 1'+DASH+'2',G.S);sect('Draws',G.D);sect('Other scores',G.O);
+  if(drops.length){
+    const nm=r=>r.h+' vs '+r.a;
+    const a=drops.filter(r=>r.drop==='nocs'),b=drops.filter(r=>r.drop==='cut'),c=drops.filter(r=>r.drop==='nok');
+    T.push('Dropped ('+drops.length+'):');
+    if(a.length)T.push('No full-time correct score: '+a.map(nm).join(', ')+'.');
+    if(b.length)T.push('Correct-score list cut off: '+b.map(nm).join(', ')+'.');
+    if(c.length)T.push('No kick-off time: '+c.map(nm).join(', ')+'.');
+  }
+  if(out.near.length){T.push('Near-ties:');for(const r of out.near)T.push(r.h+' vs '+r.a+': '+r.sc[0]+DASH+r.sc[1]+' at '+r.co.toFixed(2)+' vs '+r.s2[0]+DASH+r.s2[1]+' at '+r.c2.toFixed(2)+'.');}
+  if(out.ties.length)T.push('Same price on two scorelines (the one that fits the favourite and the BTTS price was taken): '+out.ties.map(r=>r.h+' vs '+r.a).join(', ')+'.');
+  out.text=T.join('\n');
+  return out;
+}
+function pct(x){return Math.round(x*100)+'%';}
+function render(){
+  const el=document.getElementById('slTab');if(!el)return;
+  const ds=daysList();
+  if(curDay==null||!ds.find(d=>d.k===curDay))curDay=autoDay();
+  const S=stats();
+  let h='';
+  if(!ds.length){el.innerHTML=resBox(S);return;}
+  h+="<div style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px'>";
+  for(const d of ds.slice(-10)){const on=d.k===curDay;h+="<button onclick=\"SL.pick('"+d.k+"')\" style='padding:6px 10px;border-radius:999px;border:1.5px solid "+(on?'var(--silver)':'var(--bd2)')+";background:"+(on?'var(--silver)':'var(--s1)')+";color:"+(on?'#fff':'var(--muted)')+";font-size:12px;font-weight:700;cursor:pointer'>"+dayLabel(d.k)+" &middot; "+d.n+"</button>";}
+  h+="</div>";
+  let PPS=new Set();try{PPS=new Set(loadLog().filter(e=>e.pp).map(e=>e.homeTeam+'|'+e.awayTeam));}catch(e){}
+  const SS=eff(curDay);const B=build(curDay,SS);
+  if(B.started&&!SS)h+="<div style='font-size:11.5px;color:var(--muted);margin-bottom:8px'>"+B.started+" match(es) already started are hidden. <a href='#' onclick='SL.toggleStarted();return false' style='color:var(--blue)'>Show them</a></div>";
+  else if(SS)h+="<div style='font-size:11.5px;color:var(--muted);margin-bottom:8px'><a href='#' onclick='SL.toggleStarted();return false' style='color:var(--blue)'>Hide matches already started</a></div>";
+  h+="<div style='background:var(--s1);border:1.5px solid var(--bd);border-radius:12px;padding:12px 14px;margin-bottom:12px'>";
+  h+="<div style='display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px'><div style='font-size:12.5px;font-weight:800'>"+dayLabel(curDay)+" &middot; "+B.ok.length+" tips</div><button class='btn-sm' onclick='SL.copy()'>Copy list</button></div>";
+  const sec=(t,a)=>{if(!a.length)return '';let s="<div style='font-weight:800;font-size:12.5px;margin:10px 0 4px'>"+t+" ("+a.length+")</div>";
+    for(const r of a){let mk='';if(r.res){const ok=r.res[0]===r.sc[0]&&r.res[1]===r.sc[1];mk=" <span style='font-weight:700;color:"+(ok?'var(--green)':'var(--dim)')+"'>&rarr; "+r.res[0]+DASH+r.res[1]+(ok?' &#x2713;':'')+"</span>";}
+      s+="<div style='font-size:12.5px;padding:2px 0;line-height:1.4'><span style='color:var(--muted)'>"+tm(r.ts)+"</span> "+esc(r.h)+" vs "+esc(r.a)+": <b>"+r.sc[0]+DASH+r.sc[1]+"</b>"+(r.late?" <span style='color:var(--amber);font-size:10.5px'>(seen after kick-off, not counted)</span>":"")+(!r.res&&PPS.has(r.h+'|'+r.a)?" <span style='color:var(--amber);font-size:10.5px'>&#x23F8; postponed</span>":"")+mk+"</div>";}
+    return s;};
+  h+=sec('Win to nil',B.G.W)+sec('2'+DASH+'1 / 1'+DASH+'2',B.G.S)+sec('Draws',B.G.D)+sec('Other scores',B.G.O);
+  if(B.drops.length){
+    const nm=r=>esc(r.h)+' vs '+esc(r.a);
+    const a=B.drops.filter(r=>r.drop==='nocs'),b=B.drops.filter(r=>r.drop==='cut'),c=B.drops.filter(r=>r.drop==='nok');
+    h+="<div style='font-weight:800;font-size:12.5px;margin:12px 0 4px'>Dropped ("+B.drops.length+")</div><div style='font-size:12px;color:var(--muted);line-height:1.5'>";
+    if(a.length)h+="No full-time correct score: "+a.map(nm).join(', ')+".<br>";
+    if(b.length)h+="Correct-score list cut off: "+b.map(nm).join(', ')+".<br>";
+    if(c.length)h+="No kick-off time: "+c.map(nm).join(', ')+".";
+    h+="</div>";
+  }
+  if(B.near.length){h+="<div style='font-weight:800;font-size:12.5px;margin:12px 0 4px'>Near-ties</div>";for(const r of B.near)h+="<div style='font-size:12px;color:var(--muted)'>"+esc(r.h)+" vs "+esc(r.a)+": "+r.sc[0]+DASH+r.sc[1]+" at "+r.co.toFixed(2)+" vs "+r.s2[0]+DASH+r.s2[1]+" at "+r.c2.toFixed(2)+".</div>";}
+  if(B.ties.length)h+="<div style='font-size:11.5px;color:var(--muted);margin-top:10px'>Same price on two scorelines (the one that fits the favourite and the BTTS price was taken): "+B.ties.map(r=>esc(r.h)+' vs '+esc(r.a)).join(', ')+".</div>";
+  h+="</div>";
+  el.innerHTML=h+resBox(S);
+}
+function resBox(S){
+  let h="<div style='background:var(--s1);border:1.5px solid var(--bd);border-radius:12px;padding:12px 14px;margin-bottom:12px'>";
+  h+="<div style='font-size:13px;font-weight:800;margin-bottom:4px'>Results and tracking</div>";
+  h+="<div style='font-size:11.5px;color:var(--muted);line-height:1.5;margin-bottom:8px'>Settled: <b>"+S.settled+"</b> &middot; waiting for a result: <b>"+S.pending+"</b>. Results are checked automatically when the app opens, every 20 minutes while it is open, and whenever you press Check results in the Log. <span id='slLast'></span></div>";
+  h+="<div id='slResMsg' style='font-size:11.5px;color:var(--muted);margin-top:6px'></div>";
+  try{const lt=+localStorage.getItem('oo_sl_last')||0;if(lt)h=h.replace("<span id='slLast'></span>","Last check: "+tm(lt)+".");}catch(e){}
+  if(S.settled){
+    h+="<div style='overflow-x:auto;margin-top:10px'><table style='width:100%;border-collapse:collapse;font-size:11.5px'><tr style='text-align:left;color:var(--muted)'><th style='padding:4px 6px 4px 0'>Tip</th><th>n</th><th>Hit</th><th>Needs</th><th>ROI</th></tr>";
+    const row=(k,label,sub)=>{const t=S.T[k];if(!t)return '';const hr=t.w/t.n;let be='',roi='';
+      if(t.no>=Math.max(3,t.n*0.6)){be=pct(t.be/t.no);const r=t.pr/t.no;roi="<span style='font-weight:700;color:"+(r>=0?'var(--green)':'var(--red)')+"'>"+(r>=0?'+':'')+(r*100).toFixed(0)+"%</span>";}
+      else{be='-';roi='<span style="color:var(--dim)">no odds</span>';}
+      return "<tr style='border-top:1px solid var(--bd)"+(sub?";color:var(--muted)":"")+"'><td style='padding:4px 6px 4px "+(sub?"12px":"0")+"'>"+(sub?'':'<b>')+label+(sub?'':'</b>')+"</td><td>"+t.n+"</td><td>"+pct(hr)+"</td><td>"+be+"</td><td>"+roi+"</td></tr>";};
+    for(const m of ['cs','res','wtn','wtn2','ov','un']){
+      let r=row(m,MNAME[m],false);if(!r)continue;h+=r;
+      if(m!=='ov'&&m!=='un'||true)for(const g of ['W','S','D','O']){h+=row(m+'|'+g,GNAME[g],true);}
+    }
+    h+="</table></div><div style='font-size:11px;color:var(--dim);margin-top:8px;line-height:1.45'>\"Needs\" is the hit rate that breaks even at the board odds. Treat any line with fewer than about 100 settled tips as early; hit rates on small samples swing a lot.</div>";
+  }
+  h+="</div>";return h;
+}
+let autoBusy=false,lastAuto=0;
+async function auto(){
+  if(autoBusy)return;autoBusy=true;
+  try{
+    const a=fromLog();const r=await checkNet(null);lastAuto=Date.now();
+    try{localStorage.setItem('oo_sl_last',String(lastAuto));}catch(e){}
+    const el=document.getElementById('slTab');if(el&&el.style.display!=='none')render();
+  }catch(e){}finally{autoBusy=false;}
+}
+function say(id,t){const e=document.getElementById(id);if(e)e.textContent=t;}
+return{
+  reg:reg,render:render,auto:auto,
+  pick:function(k){curDay=k;render();},
+  toggleStarted:function(){showStarted=!showStarted;render();},
+  readBoxes:function(){const t=document.getElementById('slBoards');const n=ingest(t?t.value:'');render();say('slMsg','Read '+n+' board(s).');},
+  readAnalyse:function(){const t=document.getElementById('oddsInput');const n=ingest(t?t.value:'');render();say('slMsg','Read '+n+' board(s) from the Analyse box.');},
+  copy:function(){
+    const B=build(curDay,eff(curDay));const t=B.text;
+    const done=()=>say('slMsg','List copied.');
+    try{navigator.clipboard.writeText(t).then(done,()=>{window.prompt('Copy the list:',t);});}catch(e){window.prompt('Copy the list:',t);}
+  },
+  applyBox:function(){const t=document.getElementById('slRes');const r=applyResults(parseResults(t?t.value:''));render();say('slResMsg','Graded '+r.n+' tip(s). '+(r.miss?r.miss+' pasted result(s) did not match any tip.':''));},
+  checkNow:async function(){const a=fromLog();const r=await checkNet(m=>say('slResMsg',m));render();say('slResMsg','Matched '+a+' from the Log and '+r.got+' of '+r.asked+' by the results check. Older matches without a saved address may need pasting.');},
+  exportRecords:function(){return load();},
+  restoreRecords:function(arr){if(!Array.isArray(arr))return;const have=load(),ids=new Set(have.map(r=>r.id));for(const r of arr){if(r&&r.id&&!ids.has(r.id)){have.push(r);ids.add(r.id);}else if(r&&r.id&&r.res){const x=have.find(q=>q.id===r.id);if(x&&!x.res){x.res=r.res;x.resAt=r.resAt;}}}save(have);},
+  _t:{makeRec:makeRec,choose:choose,readCS:readCS,parseResults:parseResults,applyResults:applyResults,nameMatch:nameMatch,build:build,stats:stats,load:load,save:save}
+};
+})();
+// a postponed match counts as a void leg (betPawa pays the slip on the remaining legs); a match with no result 72h after kick-off counts the same way
+function __ppVoid(e){return !!e&&(e.pp==='postponed'||(e.pp==='overdue'&&!!e.kickoffTs&&Date.now()-e.kickoffTs>72*3600e3));}
+// automatic grading: on open, every 20 minutes, when the tab is shown, and after the Log's own result check
+(function(){
+  setTimeout(()=>{try{SL.auto();}catch(e){}},5000);
+  setInterval(()=>{try{SL.auto();}catch(e){}},20*60000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden){try{SL.auto();}catch(e){}}});
+  const __cr=checkResults;checkResults=async function(){const r=await __cr.apply(this,arguments);try{SL.auto();}catch(e){}return r;};
+  const __st=switchTab;switchTab=function(t){const r=__st.apply(this,arguments);if(t==='scores'){try{SL.auto();}catch(e){}}return r;};
+})();
+// every board the Oracle reads is also read for its correct-score prices
+(function(){const __p=parseOddsBoard;parseOddsBoard=function(raw){const r=__p.apply(this,arguments);try{SL.reg(raw,r);}catch(e){}return r;};})();
+</script>
 <script>
 /* betPawa auto-fetch (Analyse tab). Adds one card above the odds box. It asks the Netlify function
    /.netlify/functions/betpawa for the day's matches and each match's odds board, puts the boards into the
@@ -3062,6 +4171,34 @@ return{VER:VER,CFG:CFG,core:{grid:grid,outcome:outcome,probs:probs,fitTotal:fitT
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",build);else build();
   window.__BP={run:run,_t:{okBoard:okBoard,norm:norm,dstr:dstr}};
+})();
+</script>
+
+<script>
+/* Odds board + stats boxes in a toggle (Analyse tab). The two paste boxes stay in the page (the betPawa card and the
+   collector fill them), they are only folded away. The "Fetch stats ... find picks" button and its status line stay visible. */
+(function(){
+  var KEY="oo_boxes_open";
+  function $(id){return document.getElementById(id);}
+  function get(){try{return localStorage.getItem(KEY)==="1";}catch(e){return false;}}
+  function put(v){try{localStorage.setItem(KEY,v?"1":"0");}catch(e){}}
+  function build(){
+    var sec=$("inputSection"),odds=$("oddsInput"),form=$("formInput");
+    if(!sec||!odds||!form||$("tgBar"))return;
+    var d1=odds.parentNode,d2=form.parentNode,targets=[];
+    Array.prototype.forEach.call(d1.children,function(c){targets.push(c);});
+    Array.prototype.forEach.call(d2.children,function(c){if(c.id!=="fetchBtn"&&c.id!=="fetchStatus"&&c.id!=="tgBar")targets.push(c);});
+    var bar=document.createElement("button");bar.id="tgBar";bar.type="button";bar.className="btn-sm";
+    bar.style.cssText="width:100%;padding:10px;margin-bottom:10px;text-align:left;font-weight:700";
+    function apply(open){
+      targets.forEach(function(t){t.style.display=open?"":"none";});
+      bar.textContent=(open?"▾ Hide":"▸ Show")+" the odds board + stats boxes (manual paste)";
+    }
+    var open=get();apply(open);
+    bar.onclick=function(){open=!open;put(open);apply(open);};
+    sec.insertBefore(bar,sec.firstChild);
+  }
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",build);else build();
 })();
 </script>
 
