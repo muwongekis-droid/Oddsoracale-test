@@ -366,7 +366,7 @@ function __slipTarget(){
   let day=null;
   if(!mode){
     // AUTOMATIC: the first day (today, tomorrow, the day after) that has enough matches still to be played, by the real kickoff date. No button needed.
-    const MIN=6,days=[today,tm,later];
+    const MIN=25,days=[today,tm,later];   // a day needs a real board (25+ matches still to play); a few late games left today must not win over tomorrow
     day=days.find(d=>__slipReady(d)>=MIN)||days.slice().sort((x,y)=>__slipReady(y)-__slipReady(x))[0]||today;
     if(__slipReady(day)===0)day=today;
     mode=day===today?"today":day===tm?"tomorrow":"later";
@@ -473,7 +473,7 @@ function __slipCands(minScore){
       if(e.aligned)pr+=0.005;
       if(p.trackRate!=null)tags.push(p.trackRate+"% ("+p.trackN+")");
       tags.push("history "+Math.round(est.p*100)+"% (n="+est.n+")");
-      all.push({d:e.date,m:e.match||(e.homeTeam+" vs "+e.awayTeam),mk:(e.homeTeam||"")+"|"+(e.awayTeam||""),pick:t,kind:m,odds,pts:Math.min(0.975,pr),tags,strong:(__moneyTag(p,e)||"").includes("B"),money:__moneyTag(p,e)||""});
+      all.push({d:e.date,ko:e.kickoffDate||'',m:e.match||(e.homeTeam+" vs "+e.awayTeam),mk:(e.homeTeam||"")+"|"+(e.awayTeam||""),pick:t,kind:m,odds,pts:Math.min(0.975,pr),tags,strong:(__moneyTag(p,e)||"").includes("B"),money:__moneyTag(p,e)||""});
     }
   }
   return{all,n:ents.length};
@@ -539,7 +539,7 @@ function __slipCard(title,b,color,emptyMsg){
 function __saveSlipRecord(S,A,B,C,D){
   try{
     const today=__slipTarget().day;
-    const leg=c=>({m:c.m,mk:c.mk,pick:c.pick,odds:c.odds,d:c.d});
+    const leg=c=>({m:c.m,mk:c.mk,pick:c.pick,odds:c.odds,d:c.d,ko:c.ko||''});
     const rec={date:today,safe:S?S.legs.map(leg):[],o15:A?A.legs.map(leg):[],full:B?B.legs.map(leg):[],over:C?C.legs.map(leg):[],daily:D?D.legs.map(leg):[],o25:[]};
     const all=JSON.parse(localStorage.getItem("oo_slips")||"[]").filter(r=>r.date!==today);
     all.unshift(rec);localStorage.setItem("oo_slips",JSON.stringify(all.slice(0,400)));
@@ -578,7 +578,7 @@ function __legInfo(date,leg){
 }
 function __legLine(date,l){
   const i=__legInfo(date,l);const col=i.r==="win"?"#16a34a":i.r==="loss"?"#dc2626":"#9090a8";
-  return "<div style='font-size:11.5px;color:var(--dim);padding-left:8px'>"+l.m+" &middot; "+l.pick+" @ "+l.odds.toFixed(2)+" <span style='color:"+col+";font-weight:700'>"+(i.r==="win"?"W":i.r==="loss"?"L":i.r==="void"?"VOID":"&#x23F3;")+"</span>"+(i.cs?" &middot; predicted "+i.cs:"")+(i.fs?" &middot; <b>actual "+i.fs+"</b>":"")+"</div>";
+  return "<div style='font-size:11.5px;color:var(--dim);padding-left:8px'>"+l.m+(l.ko?" &middot; plays "+l.ko.replace(/ 20\d\d$/,''):'')+" &middot; "+l.pick+" @ "+l.odds.toFixed(2)+" <span style='color:"+col+";font-weight:700'>"+(i.r==="win"?"W":i.r==="loss"?"L":i.r==="void"?"VOID":"&#x23F3;")+"</span>"+(i.cs?" &middot; predicted "+i.cs:"")+(i.fs?" &middot; <b>actual "+i.fs+"</b>":"")+"</div>";
 }
 function __slipStatus(date,legs){
   if(!legs.length)return null;
@@ -2946,6 +2946,122 @@ return{VER:VER,CFG:CFG,core:{grid:grid,outcome:outcome,probs:probs,fitTotal:fitT
     try{V2.renderTracker();}catch(e){}
     return r;
   };
+})();
+</script>
+
+<script>
+/* betPawa auto-fetch (Analyse tab). Adds one card above the odds box. It asks the Netlify function
+   /.netlify/functions/betpawa for the day's matches and each match's odds board, puts the boards into the
+   odds box 10 at a time and presses the normal "Fetch stats ... find picks" button, exactly like the collector
+   does. The analysis rules are NOT touched: this only replaces copy-and-paste. */
+(function(){
+  var FN="/.netlify/functions/betpawa",MINM=20,BATCH=10,PAR=4,SOON=5*60e3;
+  var day="tomorrow",running=false,stopFlag=false,wake=null;
+  function $(id){return document.getElementById(id);}
+  function sleep(ms){return new Promise(function(r){setTimeout(r,ms);});}
+  function eatDay(ms){return new Date(ms+3*3600e3).toISOString().slice(0,10);}
+  function norm(s){return String(s||"").toLowerCase().replace(/[^a-z0-9]/g,"");}
+  function dstr(ts){return new Date(ts).toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"});}
+  function say(t){var e=$("bpStatus");if(e)e.textContent=t;}
+  async function jget(url,tries,ms){
+    for(var i=0;i<(tries||2);i++){
+      try{
+        var c=new AbortController(),t=setTimeout(function(){c.abort();},ms||25000);
+        var r=await fetch(url,{signal:c.signal});clearTimeout(t);
+        if(r.ok)return await r.json();
+      }catch(e){}
+      await sleep(900);
+    }
+    return null;
+  }
+  function okBoard(j){return !!(j&&j.board&&/1X2 \| Full Time/.test(j.board)&&/Over\/Under \| Full Time/.test(j.board));}
+  async function getBoards(part){
+    var out=new Array(part.length),next=0;
+    async function worker(){
+      while(true){
+        var i=next++;if(i>=part.length||stopFlag)return;
+        var j=await jget(FN+"?id="+encodeURIComponent(part[i].id),2,25000);
+        if(okBoard(j))out[i]=j.board;
+      }
+    }
+    var ws=[];for(var k=0;k<PAR;k++)ws.push(worker());
+    await Promise.all(ws);
+    return out.filter(function(x){return !!x;});
+  }
+  function haveSet(){
+    var s={};
+    try{loadLog().forEach(function(e){if(e&&e.homeTeam&&e.awayTeam&&e.kickoffDate)s[norm(e.homeTeam)+"|"+norm(e.awayTeam)+"|"+e.kickoffDate]=1;});}catch(e){}
+    return s;
+  }
+  function paint(){
+    var a=$("bpToday"),b=$("bpTomorrow");if(!a||!b)return;
+    a.style.outline=day==="today"?"2px solid #0d9488":"none";b.style.outline=day==="tomorrow"?"2px solid #0d9488":"none";
+  }
+  async function run(){
+    if(running)return;
+    var box=$("oddsInput"),fb=$("fetchBtn"),sec=$("inputSection");
+    if(!box||!fb||!sec){say("The Analyse screen is not ready.");return;}
+    if(sec.style.display==="none"&&$("resetBtn")){$("resetBtn").click();await sleep(400);}
+    if(box.value.trim()){say("The odds box already has text. Tap New (or clear the box) first, then try again.");return;}
+    running=true;stopFlag=false;
+    $("bpRun").disabled=true;$("bpStop").style.display="inline-block";
+    try{if(navigator.wakeLock)wake=await navigator.wakeLock.request("screen");}catch(e){}
+    var done=0,noBoard=0,notRun=0,total=0;
+    try{
+      var d=eatDay(Date.now()+(day==="tomorrow"?864e5:0));
+      say("Getting betPawa's match list for "+d+" ...");
+      var L=await jget(FN+"?list=1&day="+d+"&min="+MINM,3,30000);
+      if(!L||!L.matches){say("Could not reach betPawa through the site. Check the connection and try again.");return;}
+      var have=haveSet(),now=Date.now();
+      var todo=L.matches.filter(function(m){
+        if(!(Date.parse(m.start)>now+SOON))return false;   // already started or about to
+        return !have[norm(m.home)+"|"+norm(m.away)+"|"+dstr(Date.parse(m.start))];
+      });
+      var already=L.matches.length-todo.length;
+      total=todo.length;
+      if(!total){say("Nothing new for "+d+": "+L.count+" matches on betPawa with enough markets, "+already+" already analysed or started.");return;}
+      var nB=Math.ceil(total/BATCH);
+      for(var i=0,bn=0;i<todo.length&&!stopFlag;i+=BATCH){
+        bn++;
+        var part=todo.slice(i,i+BATCH);
+        say("Batch "+bn+" of "+nB+": getting "+part.length+" boards from betPawa ("+done+" of "+total+" analysed so far). Keep this page open.");
+        var boards=await getBoards(part);
+        noBoard+=part.length-boards.length;
+        if(!boards.length)continue;
+        if(sec.style.display==="none"&&$("resetBtn")){$("resetBtn").click();await sleep(400);}
+        box.value=boards.join("\n\n");box.dispatchEvent(new Event("input",{bubbles:true}));
+        say("Batch "+bn+" of "+nB+": fetching stats and finding picks for "+boards.length+" matches ("+done+" of "+total+" done). Keep this page open.");
+        fb.click();await sleep(500);
+        if(fb.disabled){var t0=Date.now();while(fb.disabled&&Date.now()-t0<10*60e3){await sleep(700);}}
+        if(sec.style.display==="none")done+=boards.length;else notRun+=boards.length;
+        await sleep(500);
+      }
+    }catch(e){say("Stopped: "+(e&&e.message||e));}
+    finally{
+      try{if(wake)wake.release();}catch(e){}wake=null;
+      running=false;$("bpRun").disabled=false;$("bpStop").style.display="none";
+      if(total)say((stopFlag?"Stopped. ":"Finished. ")+done+" of "+total+" new matches analysed"+(noBoard?"; "+noBoard+" skipped (betPawa has no full odds board for them yet)":"")+(notRun?"; "+notRun+" could not be analysed (no exact stats)":"")+". They are saved in the Log.");
+    }
+  }
+  function build(){
+    if($("bpCard"))return;
+    var host=$("inputSection");if(!host||!host.parentNode)return;
+    var c=document.createElement("div");c.id="bpCard";c.style.cssText="background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;padding:11px 14px;margin-bottom:14px";
+    c.innerHTML="<div class='box-label'>&#x1F4E5; betPawa odds, automatic</div>"+
+      "<div class='box-sub'>Loads the matches straight from betPawa (no copying), puts their odds in the box 10 at a time and finds the picks. Matches already analysed or about to start are skipped.</div>"+
+      "<div style='display:flex;gap:8px;margin-bottom:8px'><button class='btn-sm' id='bpToday' type='button'>Today</button><button class='btn-sm' id='bpTomorrow' type='button'>Tomorrow</button></div>"+
+      "<button class='run-btn' id='bpRun' type='button' style='background:linear-gradient(135deg,#0d9488,#2563eb);margin-bottom:6px'>&#x1F4E5; Load from betPawa + find the picks</button>"+
+      "<button class='btn-sm' id='bpStop' type='button' style='display:none;width:100%;padding:9px;margin-bottom:6px'>Stop after this batch</button>"+
+      "<div id='bpStatus' class='box-sub' style='margin:0'></div>";
+    host.parentNode.insertBefore(c,host);
+    $("bpToday").onclick=function(){day="today";paint();};
+    $("bpTomorrow").onclick=function(){day="tomorrow";paint();};
+    $("bpRun").onclick=run;
+    $("bpStop").onclick=function(){stopFlag=true;say("Stopping after this batch...");};
+    paint();
+  }
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",build);else build();
+  window.__BP={run:run,_t:{okBoard:okBoard,norm:norm,dstr:dstr}};
 })();
 </script>
 
